@@ -289,8 +289,8 @@ def play_stream(game_id, bandwidth, live_from_beginning=False):
 
     # print(cmd)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    proc.wait()
     session.save_config()
+    return proc
 
 def main():
 
@@ -307,8 +307,8 @@ def main():
                         help='MLB game ID to stream')
     options, args = parser.parse_known_args()
 
-    play_stream(options.game_id, options.resolution)
-
+    proc = play_stream(options.game_id, options.resolution)
+    proc.wait()
 
 if __name__ == "__main__":
     main()

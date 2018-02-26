@@ -174,6 +174,8 @@ class GamesDataTable(DataTable):
         elif key == "t":
             self.game_date = datetime.now().date()
             self.reset()
+        elif key == "w":
+            self._emit("watch", self.selection.data.game_id)
         else:
             return key
 
@@ -258,24 +260,6 @@ class GamesDataTable(DataTable):
                     line = line_score
                 )
 
-    def keypress(self, size, key):
-
-        if key == "w":
-            self._emit("watch", self.selection.data.game_id)
-            # self.watch(self.selection)
-        else:
-            return super(GamesDataTable, self).keypress(size, key)
-
-        # # raise Exception(self.game_id)
-        # cmd = [
-        #     "mlbplay",
-        #     "--beginning",
-        #     str(selection.data.game_id)
-        # ]
-        # # raise Exception(cmd)
-
-        # proc = subprocess.Popen(cmd)
-        # # proc.wait()
 
 class Toolbar(urwid.WidgetWrap):
 
