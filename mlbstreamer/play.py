@@ -18,20 +18,13 @@ import requests
 import lxml
 import lxml, lxml.etree
 # from requests_toolbelt.utils import dump
-import yaml
 from orderedattrdict import AttrDict
-import orderedattrdict.yamlutils
-from orderedattrdict.yamlutils import AttrDictYAMLLoader
 import memoize
 from memoize.core import *
 import pytz
 import dateutil.parser
 
-
-CONFIG_DIR=os.path.expanduser("~/.mlb")
-CONFIG_FILE=os.path.join(CONFIG_DIR, "config.yaml")
-COOKIE_FILE=os.path.join(CONFIG_DIR, "cookies")
-
+from . import *
 
 USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:56.0) "
               "Gecko/20100101 Firefox/56.0.4")
@@ -61,6 +54,8 @@ STREAM_URL="https://edge.svcs.mlb.com/media/{media_id}/scenarios/browser"
 store = {}
 memo = Memoizer(store)
 
+COOKIE_FILE=os.path.join(CONFIG_DIR, "cookies")
+
 class MLBSession(object):
 
     HEADERS = {
@@ -69,7 +64,6 @@ class MLBSession(object):
 
     def __init__(self):
 
-        self.load_config()
         self.session = requests.Session()
         self.session.cookies = LWPCookieJar(COOKIE_FILE)
         self.session.cookies.load(ignore_discard=True)
@@ -79,14 +73,14 @@ class MLBSession(object):
 
         # self.login()
 
-    def load_config(self):
-        if not os.path.exists(CONFIG_FILE):
-            raise Exception("config file %s not found" %(CONFIG_FILE))
-        self.config = yaml.load(open(CONFIG_FILE), Loader=AttrDictYAMLLoader)
+    # def load_config(self):
+    #     if not os.path.exists(CONFIG_FILE):
+    #         raise Exception("config file %s not found" %(CONFIG_FILE))
+    #     config = yaml.load(open(CONFIG_FILE), Loader=AttrDictYAMLLoader)
 
-    def save_config(self):
-        with open(CONFIG_FILE, 'w') as outfile:
-            yaml.dump(self.config, outfile, default_flow_style=False)
+    # def save_config(self):
+    #     with open(CONFIG_FILE, 'w') as outfile:
+    #         yaml.dump(config, outfile, default_flow_style=False)
 
     def login(self):
 
@@ -100,8 +94,8 @@ class MLBSession(object):
         data = {
             "uri": "/account/login_register.jsp",
             "registrationAction": "identify",
-            "emailAddress": self.config.userid,
-            "password": self.config.password,
+            "emailAddress": config.userid,
+            "password": config.password,
             "submitButton": ""
         }
 
@@ -130,16 +124,16 @@ class MLBSession(object):
     @property
     def api_key(self):
 
-        if not "api_key" in self.config:
+        if not "api_key" in config:
             self.update_api_keys()
-        return self.config.api_key
+        return config.api_key
 
     @property
     def client_api_key(self):
 
-        if not "client_api_key" in self.config:
+        if not "client_api_key" in config:
             self.update_api_keys()
-        return self.config.client_api_key
+        return config.client_api_key
 
     def update_api_keys(self):
 
@@ -150,9 +144,9 @@ class MLBSession(object):
         scripts = data.xpath(".//script")
         for script in scripts:
             if script.text and "apiKey" in script.text:
-                self.config.api_key = API_KEY_RE.search(script.text).groups()[0]
+                config.api_key = API_KEY_RE.search(script.text).groups()[0]
             if script.text and "clientApiKey" in script.text:
-                self.config.client_api_key = CLIENT_API_KEY_RE.search(script.text).groups()[0]
+                config.client_api_key = CLIENT_API_KEY_RE.search(script.text).groups()[0]
 
     @property
     @memo
@@ -274,7 +268,7 @@ def play_stream(game_id, bandwidth, live_from_beginning=False):
     cmd = [
         "streamlink",
         # "-l", "debug",
-        "--player", "mpv --osd-level=0 --no-osc --no-border",
+        "--player", config.player,
         "--http-header",
         "Authorization=%s" %(session.access_token),
         url,
@@ -289,12 +283,10 @@ def play_stream(game_id, bandwidth, live_from_beginning=False):
 
     # print(cmd)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-    session.save_config()
+    # session.save_config()
     return proc
 
 def main():
-
-    global config
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-b", "--beginning", help="play from beginning",
