@@ -236,28 +236,39 @@ class Toolbar(urwid.WidgetWrap):
 
     def __init__(self):
 
+        self.league_dropdown = Dropdown(AttrDict([
+                ("MLB", 1),
+                ("AAA", 11),
+            ]) , label="League: ")
+
         self.live_stream_dropdown = Dropdown([
             "from beginning",
             "live"
         ], label="Live streams: ")
 
-        self.resolution_dropdown = Dropdown(AttrDict([
-            ("720p (60fps)", "720p_alt"),
-            ("720p", "720p"),
-            ("540p", "540p"),
-            ("504p", "504p"),
-            ("360p", "360p"),
-            ("288p", "288p"),
-            ("224p", "224p")
-        ]), label="resolution")
+        self.resolution_dropdown = Dropdown(
+            AttrDict([
+                ("720p (60fps)", "720p_alt"),
+                ("720p", "720p"),
+                ("540p", "540p"),
+                ("504p", "504p"),
+                ("360p", "360p"),
+                ("288p", "288p"),
+                ("224p", "224p")
+            ]), label="resolution")
 
         self.columns = urwid.Columns([
+            (20, self.league_dropdown),
             (36, self.live_stream_dropdown),
             (30, self.resolution_dropdown),
             ("weight", 1, urwid.Padding(urwid.Text("")))
         ])
         self.filler = urwid.Filler(self.columns)
         super(Toolbar, self).__init__(self.filler)
+
+    @property
+    def sport_id(self):
+        return (self.league_dropdown.selected_value)
 
     @property
     def resolution(self):
@@ -269,15 +280,13 @@ class Toolbar(urwid.WidgetWrap):
 
 class ScheduleView(urwid.WidgetWrap):
 
-    def __init__(self, sport_id):
-
-        self.sport_id = sport_id
+    def __init__(self):
 
         today = datetime.now().date()
-        self.table = GamesDataTable(sport_id, today) # preseason
+        self.toolbar = Toolbar()
+        self.table = GamesDataTable(self.toolbar.sport_id, today) # preseason
         urwid.connect_signal(self.table, "watch",
                              lambda dsource, game_id: self.watch(game_id))
-        self.toolbar = Toolbar()
         self.pile  = urwid.Pile([
             (1, self.toolbar),
             ("weight", 1, self.table)
@@ -363,12 +372,14 @@ def main():
     screen = urwid.raw_display.Screen()
     screen.set_terminal_properties(256)
 
-    MLB_SPORT_ID=1 # MLB. http://statsapi.mlb.com/api/v1/sports/ for others
-    view = ScheduleView(MLB_SPORT_ID)
+    view = ScheduleView()
 
     log_console = widgets.ConsoleWindow()
-    log_box = urwid.BoxAdapter(urwid.LineBox(log_console), 10)
-    frame = urwid.Frame(urwid.LineBox(view), footer=log_box)
+    # log_box = urwid.BoxAdapter(urwid.LineBox(log_console), 10)
+    pile = urwid.Pile([
+        ("weight", 1, urwid.LineBox(view)),
+        (10, urwid.LineBox(log_console))
+    ])
 
     def global_input(key):
         if key in ('q', 'Q'):
@@ -377,7 +388,7 @@ def main():
             return False
 
     state.loop = urwid.MainLoop(
-        frame,
+        pile,
         palette,
         screen=screen,
         unhandled_input=global_input,

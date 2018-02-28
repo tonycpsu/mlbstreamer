@@ -45,7 +45,7 @@ GAME_CONTENT_URL_TEMPLATE="http://statsapi.mlb.com/api/v1/game/{game_id}/content
 SCHEDULE_TEMPLATE=(
     "http://statsapi.mlb.com/api/v1/schedule"
     "?sportId={sport_id}&startDate={start}&endDate={end}"
-    "&gameType={game_type}&game_pk={game_id}"
+    "&gameType={game_type}&gamePk={game_id}"
     "&hydrate=linescore,team,game(content(summary,media(epg)),tickets)"
 )
 
@@ -263,29 +263,53 @@ class MLBSession(object):
             game_id=None
     ):
 
+        logger.debug(
+            "getting schedule: %s, %s, %s, %s, %s" %(
+                sport_id,
+                start,
+                end,
+                game_type,
+                game_id
+            )
+        )
         url = SCHEDULE_TEMPLATE.format(
-            sport_id = sport_id,
-            start = start.strftime("%Y-%m-%d"),
-            end = end.strftime("%Y-%m-%d"),
-            game_type = game_type,
-            game_id = game_id
+            sport_id = sport_id if sport_id else "",
+            start = start.strftime("%Y-%m-%d") if start else "",
+            end = end.strftime("%Y-%m-%d") if end else "",
+            game_type = game_type if game_type else "",
+            game_id = game_id if game_id else ""
         )
         return self.session.get(url).json()
 
-    def get_media(self, game_id, preferred_stream="HOME"):
+    @memo(region="short")
+    def get_media(self, game_id,
+                  title="MLBTV",
+                  preferred_stream=None):
 
-        for epg in self.content(game_id)["media"]["epg"]:
-            if epg["title"] == "MLBTV":
+        schedule = self.schedule(game_id=game_id)
+        logger.debug(schedule)
+        try:
+            game = schedule["dates"][0]["games"][0]
+        except KeyError:
+            logger.debug("no game data")
+            return None
+        for epg in game["content"]["media"]["epg"]:
+            if title in [None, epg["title"]]:
                 for item in epg["items"]:
-                    if item["mediaFeedType"] == preferred_stream:
-                        return item
+                    if preferred_stream in [None, item["mediaFeedType"]]:
+                        yield item
                 else:
-                    return epg["items"][0]
-                return epg
+                    if len(epg["items"]):
+                        yield epg["items"][0]
+        raise StopIteration
 
     def get_stream(self, game_id):
 
-        media = self.get_media(game_id)
+        try:
+            media = next(self.get_media(game_id))
+        except StopIteration:
+            logger.debug("no media for stream")
+            return
         media_id = media["mediaId"]
 
         headers={
@@ -300,6 +324,8 @@ class MLBSession(object):
             STREAM_URL_TEMPLATE.format(media_id=media_id),
             headers=headers
         ).json()
+        if "errors" in stream and len(stream["errors"]):
+            return None
         return stream
 
 __all__ = ["MLBSession", "MLBSessionException"]

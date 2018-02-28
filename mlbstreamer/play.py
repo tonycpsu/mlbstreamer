@@ -20,9 +20,17 @@ def play_stream(game_id, resolution, live_from_beginning=False):
     offset = None
 
     stream = state.session.get_stream(game_id)
+    if not stream:
+        logger.info("no matching media for game %d" %(game_id))
+        return
+    logger.debug(stream)
     url = stream["stream"]["complete"]
 
-    media = state.session.get_media(game_id)
+    try:
+        media = next(state.session.get_media(game_id))
+    except StopIteration:
+        logger.info("no matching stream for game %d" %(game_id))
+
     media_id = media["mediaId"]
     media_state = media["mediaState"]
 

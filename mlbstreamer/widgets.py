@@ -27,7 +27,7 @@ class ScrollbackListBox(urwid.WidgetWrap):
         result = urwid.Text(label)
         self._results.append(result)
         self._listbox._invalidate()
-        self.updated = True
+        self.on_updated()
 
 
     def keypress(self, size, key):
@@ -54,11 +54,12 @@ class ScrollbackListBox(urwid.WidgetWrap):
         self._results.reset()
 
     def on_updated(self):
-        self._listbox.set_focus(len(self._results)-1)
-        self._listbox._invalidate()
+        self.set_focus(len(self._results)-1)
+        self._invalidate()
         state.loop.draw_screen()
-        self.updated = False
 
+    def selectable(self):
+        return True
 
 
 class ConsoleWindow(urwid.WidgetWrap):
@@ -67,7 +68,7 @@ class ConsoleWindow(urwid.WidgetWrap):
 
         # self.fd = fd
         self.verbose = verbose
-        self.listbox =  panwid.listbox.ScrollingListBox([])
+        self.listbox =  panwid.listbox.ScrollingListBox([], with_scrollbar=True)
         super(ConsoleWindow, self).__init__(self.listbox)
 
     def log_message(self, msg):
