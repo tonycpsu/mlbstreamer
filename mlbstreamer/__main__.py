@@ -24,17 +24,12 @@ import orderedattrdict.yamlutils
 from orderedattrdict.yamlutils import AttrDictYAMLLoader
 
 from . import state
+from .state import memo
 from . import config
 from . import play
 from . import widgets
 from .session import *
 
-
-SCHEDULE_TEMPLATE=(
-    "http://statsapi.mlb.com/api/v1/schedule"
-    "?sportId={sport_id}&startDate={start}&endDate={end}&gameType={game_type}"
-    "&hydrate=linescore,team"
-)
 
 
 class UrwidLoggingHandler(logging.Handler):
@@ -188,14 +183,12 @@ class GamesDataTable(DataTable):
 
     def query(self, *args, **kwargs):
 
-        url = SCHEDULE_TEMPLATE.format(
+        j = state.session.schedule(
             sport_id=self.sport_id,
-            start=self.game_date.strftime("%Y-%m-%d"),
-            end=self.game_date.strftime("%Y-%m-%d"),
+            start=self.game_date,
+            end=self.game_date,
             game_type=self.game_type
         )
-        j = requests.get(url).json()
-
         for d in j["dates"]:
 
             for g in d["games"]:
@@ -304,6 +297,7 @@ class ScheduleView(urwid.WidgetWrap):
 def main():
 
     global options
+    global logger
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action="store_true")

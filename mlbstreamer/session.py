@@ -20,6 +20,8 @@ from orderedattrdict.yamlutils import AttrDictYAMLLoader
 import pytz
 
 from . import config
+from . import state
+from .state import memo
 
 USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:56.0) "
               "Gecko/20100101 Firefox/56.0.4")
@@ -31,23 +33,25 @@ API_KEY_URL= "https://www.mlb.com/tv/g490865/"
 API_KEY_RE = re.compile(r'"apiKey":"([^"]+)"')
 CLIENT_API_KEY_RE = re.compile(r'"clientApiKey":"([^"]+)"')
 
-TOKEN_URL = (
+TOKEN_URL_TEMPLATE = (
     "https://media-entitlement.mlb.com/jwt"
     "?ipid={ipid}&fingerprint={fingerprint}==&os={platform}&appname=mlbtv_web"
 )
 
-GAME_CONTENT_URL="http://statsapi.mlb.com/api/v1/game/{game_id}/content"
+GAME_CONTENT_URL_TEMPLATE="http://statsapi.mlb.com/api/v1/game/{game_id}/content"
 
 # GAME_FEED_URL = "http://statsapi.mlb.com/api/v1/game/{game_id}/feed/live"
 
-SCHEDULE_URL = "http://statsapi.mlb.com/api/v1/schedule?gamePk={game_id}"
+SCHEDULE_TEMPLATE=(
+    "http://statsapi.mlb.com/api/v1/schedule"
+    "?sportId={sport_id}&startDate={start}&endDate={end}"
+    "&gameType={game_type}&game_pk={game_id}"
+    "&hydrate=linescore,team,game(content(summary,media(epg)),tickets)"
+)
 
 ACCESS_TOKEN_URL = "https://edge.bamgrid.com/token"
 
-STREAM_URL="https://edge.svcs.mlb.com/media/{media_id}/scenarios/browser"
-
-# store = {}
-# memo = Memoizer(store)
+STREAM_URL_TEMPLATE="https://edge.svcs.mlb.com/media/{media_id}/scenarios/browser"
 
 SESSION_FILE=os.path.join(config.CONFIG_DIR, "session")
 COOKIE_FILE=os.path.join(config.CONFIG_DIR, "cookies")
@@ -203,7 +207,7 @@ class MLBSession(object):
             headers = {"x-api-key": self.api_key}
 
             response = self.session.get(
-                TOKEN_URL.format(
+                TOKEN_URL_TEMPLATE.format(
                     ipid=self.ipid, fingerprint=self.fingerprint, platform=PLATFORM
                 ),
                 headers=headers
@@ -243,21 +247,33 @@ class MLBSession(object):
 
     def content(self, game_id):
 
-        return self.session.get(GAME_CONTENT_URL.format(game_id=game_id)).json()
+        return self.session.get(GAME_CONTENT_URL_TEMPLATE.format(game_id=game_id)).json()
 
     # def feed(self, game_id):
 
     #     return self.session.get(GAME_FEED_URL.format(game_id=game_id)).json()
 
-    def schedule(self, game_id):
+    @memo(region="short")
+    def schedule(
+            self,
+            sport_id=None,
+            start=None,
+            end=None,
+            game_type=None,
+            game_id=None
+    ):
 
-        return self.session.get(
-            SCHEDULE_URL.format(game_id=game_id)
-        ).json()
+        url = SCHEDULE_TEMPLATE.format(
+            sport_id = sport_id,
+            start = start.strftime("%Y-%m-%d"),
+            end = end.strftime("%Y-%m-%d"),
+            game_type = game_type,
+            game_id = game_id
+        )
+        return self.session.get(url).json()
 
     def get_media(self, game_id, preferred_stream="HOME"):
 
-        # print(j)
         for epg in self.content(game_id)["media"]["epg"]:
             if epg["title"] == "MLBTV":
                 for item in epg["items"]:
@@ -268,7 +284,7 @@ class MLBSession(object):
                 return epg
 
     def get_stream(self, game_id):
-        # print(self.access_token)
+
         media = self.get_media(game_id)
         media_id = media["mediaId"]
 
@@ -281,10 +297,9 @@ class MLBSession(object):
             "origin": "https://www.mlb.com"
         }
         stream = self.session.get(
-            STREAM_URL.format(media_id=media_id),
+            STREAM_URL_TEMPLATE.format(media_id=media_id),
             headers=headers
         ).json()
-        # raise Exception(stream)
         return stream
 
 __all__ = ["MLBSession", "MLBSessionException"]
