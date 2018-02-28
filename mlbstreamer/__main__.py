@@ -1,10 +1,12 @@
 import logging
-logger = logging.getLogger(__name__)
+# global logger
+# logger = logging.getLogger(__name__)
 import os
 from datetime import datetime, timedelta
 from collections import namedtuple
 import argparse
 import subprocess
+import select
 
 import urwid
 import urwid.raw_display
@@ -21,30 +23,36 @@ import yaml
 import orderedattrdict.yamlutils
 from orderedattrdict.yamlutils import AttrDictYAMLLoader
 
-CONFIG_DIR=os.path.expanduser("~/.mlb")
-CONFIG_FILE=os.path.join(CONFIG_DIR, "config.yaml")
-
+from . import state
+from . import config
 from . import play
+from . import widgets
+from .session import *
 
-def load_config():
-    global config
-    if not os.path.exists(CONFIG_FILE):
-        raise Exception("config file %s not found" %(CONFIG_FILE))
-    config = yaml.load(open(CONFIG_FILE), Loader=AttrDictYAMLLoader)
-    if config.time_zone:
-        config.tz = pytz.timezone(config.time_zone)
-
-
-def save_config():
-    global config
-    with open(CONFIG_FILE, 'w') as outfile:
-        yaml.dump(config, outfile)
 
 SCHEDULE_TEMPLATE=(
     "http://statsapi.mlb.com/api/v1/schedule"
     "?sportId={sport_id}&startDate={start}&endDate={end}&gameType={game_type}"
     "&hydrate=linescore,team"
 )
+
+
+class UrwidLoggingHandler(logging.Handler):
+
+    # def __init__(self, console):
+
+    #     self.console = console
+    #     super(UrwidLoggingHandler, self).__init__()
+
+    def connect(self, pipe):
+        self.pipe = pipe
+
+    def emit(self, rec):
+
+        msg = self.format(rec)
+        (ignore, ready, ignore) = select.select([], [self.pipe], [])
+        if self.pipe in ready:
+            os.write(self.pipe, (msg+"\n").encode("utf-8"))
 
 
 def parse_int(n):
@@ -63,6 +71,7 @@ class Side(AttrDict):
 
 class Inning(AttrDict):
     pass
+
 
 class LineScoreDataTable(DataTable):
 
@@ -115,8 +124,6 @@ class LineScoreDataTable(DataTable):
                         )
                     if hide_spoilers:
                         setattr(line, str(n+1), "?")
-
-
 
             if not s:
                 columns.append(
@@ -200,39 +207,11 @@ class GamesDataTable(DataTable):
                 away_abbrev = g["teams"]["away"]["team"]["abbreviation"]
                 home_abbrev = g["teams"]["home"]["team"]["abbreviation"]
                 start_time = dateutil.parser.parse(g["gameDate"])
-                if config.time_zone:
-                    # print(start_time)
-                    start_time = start_time.astimezone(config.tz)
-                    # print(start_time)
-                # if status == "DI":
-                #     logger.info("game %s (%s) postponed" %(game_pk, start_time))
-                #     continue
-                # game_num = g["gameNumber"]
-                # game = ProGame_MLB.get_for_update(mlb_game_id = game_pk)
-                # if game:
-                #     game.start_time = start_time
-                #     game.mlb_game_num = game_num
-                #     game.away_team = away_team
-                #     game.home_team = home_team
-                #     game.status = status
-                # else:
-                #     game = ProGame_MLB(
-                #         season = self,
-                #         game_type = game_type,
-                #         mlb_game_id = game_pk,
-                #         start_time = start_time,
-                #         away_team = away_team,
-                #         home_team = home_team,
-                #         mlb_game_num = game_num,
-                #         status = status
-                #     )
+                if config.settings.time_zone:
+                    start_time = start_time.astimezone(config.settings.tz)
 
-                # if "linescore" in g:
-                #     game.update_line_score(g["linescore"])
-                # ]
-                # raise Exception
                 hide_spoilers = set([away_abbrev, home_abbrev]).intersection(
-                    set(config.get("hide_spoiler_teams", [])))
+                    set(config.settings.get("hide_spoiler_teams", [])))
 
                 if len(g["linescore"]["innings"]):
                     line_score = urwid.BoxAdapter(
@@ -256,7 +235,6 @@ class GamesDataTable(DataTable):
                         start_time.minute,
                         "p" if start_time.hour >= 12 else "a"
                     ),
-                    # line = LineScoreDisplay.from_mlb_api(g["linescore"])
                     line = line_score
                 )
 
@@ -270,19 +248,19 @@ class Toolbar(urwid.WidgetWrap):
             "live"
         ], label="Live streams: ")
 
-        self.resolution_dropdown = Dropdown([
-            "720p",
-            "720p_alt",
-            "540p",
-            "504p",
-            "360p",
-            "288p",
-            "224p"
-        ], label="resolution")
+        self.resolution_dropdown = Dropdown(AttrDict([
+            ("720p (60fps)", "720p_alt"),
+            ("720p", "720p"),
+            ("540p", "540p"),
+            ("504p", "504p"),
+            ("360p", "360p"),
+            ("288p", "288p"),
+            ("224p", "224p")
+        ]), label="resolution")
 
         self.columns = urwid.Columns([
             (36, self.live_stream_dropdown),
-            (20, self.resolution_dropdown),
+            (30, self.resolution_dropdown),
             ("weight", 1, urwid.Padding(urwid.Text("")))
         ])
         self.filler = urwid.Filler(self.columns)
@@ -290,7 +268,7 @@ class Toolbar(urwid.WidgetWrap):
 
     @property
     def resolution(self):
-        return (self.resolution_dropdown.selected_label)
+        return (self.resolution_dropdown.selected_value)
 
     @property
     def start_from_beginning(self):
@@ -315,7 +293,7 @@ class ScheduleView(urwid.WidgetWrap):
         super(ScheduleView, self).__init__(self.pile)
 
     def watch(self, game_id):
-        # raise Exception(game_id)
+        logger.info("playing game %d at %s" %(game_id, self.toolbar.resolution))
         play.play_stream(
             game_id,
             self.toolbar.resolution,
@@ -323,29 +301,38 @@ class ScheduleView(urwid.WidgetWrap):
         )
 
 
-
 def main():
 
     global options
-    global config
-
-    load_config()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action="store_true")
     options, args = parser.parse_known_args()
 
-    if options.verbose:
-        import logging
-        global logger
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s [%(levelname)8s] %(message)s",
-                                      datefmt='%Y-%m-%d %H:%M:%S')
-        fh = logging.FileHandler("mlb.log")
-        fh.setFormatter(formatter)
-        logger.addHandler(fh)
+    log_file = os.path.join(config.CONFIG_DIR, "mlbstreamer.log")
 
+    formatter = logging.Formatter(
+        "%(asctime)s [%(module)16s:%(lineno)-4d] [%(levelname)8s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+
+    fh = logging.FileHandler(log_file)
+    fh.setLevel(logging.DEBUG)
+    fh.setFormatter(formatter)
+
+    logger = logging.getLogger("mlbstreamer")
+    logger.setLevel(logging.INFO)
+    logger.addHandler(fh)
+
+    ulh = UrwidLoggingHandler()
+    ulh.setLevel(logging.DEBUG)
+    ulh.setFormatter(formatter)
+    logger.addHandler(ulh)
+
+    logger.debug("mlbstreamer starting")
+    config.settings.load()
+
+    state.session = MLBSession.get()
 
     entries = {
         "dropdown_text": PaletteEntry(
@@ -385,7 +372,9 @@ def main():
     MLB_SPORT_ID=1 # MLB. http://statsapi.mlb.com/api/v1/sports/ for others
     view = ScheduleView(MLB_SPORT_ID)
 
-    frame = urwid.Frame(view)
+    log_console = widgets.ConsoleWindow()
+    log_box = urwid.BoxAdapter(urwid.LineBox(log_console), 10)
+    frame = urwid.Frame(urwid.LineBox(view), footer=log_box)
 
     def global_input(key):
         if key in ('q', 'Q'):
@@ -393,13 +382,20 @@ def main():
         else:
             return False
 
-    loop = urwid.MainLoop(frame,
-                          palette,
-                          screen=screen,
-                          unhandled_input=global_input,
-                          pop_ups=True
+    state.loop = urwid.MainLoop(
+        frame,
+        palette,
+        screen=screen,
+        unhandled_input=global_input,
+        pop_ups=True
     )
-    loop.run()
+    ulh.connect(state.loop.watch_pipe(log_console.log_message))
+    logger.info("mlbstreamer starting")
+    if options.verbose:
+        logger.setLevel(logging.DEBUG)
+
+    state.loop.run()
+
 
 if __name__ == "__main__":
     main()
