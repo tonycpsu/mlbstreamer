@@ -34,6 +34,7 @@ setup(name=name,
           "pyyaml",
           "py-dateutil",
           "streamlink",
+          "prompt_toolkit"
       ],
       extras_require={
           'gui':  [
