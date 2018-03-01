@@ -46,6 +46,7 @@ SCHEDULE_TEMPLATE=(
     "http://statsapi.mlb.com/api/v1/schedule"
     "?sportId={sport_id}&startDate={start}&endDate={end}"
     "&gameType={game_type}&gamePk={game_id}"
+    "&teamId={team_id}"
     "&hydrate=linescore,team,game(content(summary,media(epg)),tickets)"
 )
 
@@ -90,6 +91,11 @@ class MLBSession(object):
         ])
         self.login()
 
+    def __getattr__(self, attr):
+        if attr in ["delete", "get", "head", "options", "post", "put", "patch"]:
+            return getattr(self.session, attr)
+        raise AttributeError(attr)
+
     @property
     def username(self):
         return self._state.username
@@ -117,6 +123,8 @@ class MLBSession(object):
         self.session.cookies.save(COOKIE_FILE)
 
     def login(self):
+
+        logger.debug("logging in")
 
         initial_url = ("https://secure.mlb.com/enterworkflow.do"
                        "?flowId=registration.wizard&c_id=mlb")
@@ -190,6 +198,7 @@ class MLBSession(object):
 
     def update_api_keys(self):
 
+        logger.debug("updating api keys")
         content = self.session.get("https://www.mlb.com/tv/g490865/").text
         parser = lxml.etree.HTMLParser()
         data = lxml.etree.parse(StringIO(content), parser)
@@ -200,9 +209,11 @@ class MLBSession(object):
                 self._state.api_key = API_KEY_RE.search(script.text).groups()[0]
             if script.text and "clientApiKey" in script.text:
                 self._state.client_api_key = CLIENT_API_KEY_RE.search(script.text).groups()[0]
+        self.save()
 
     @property
     def token(self):
+        logger.debug("getting token")
         if not self._state.token:
             headers = {"x-api-key": self.api_key}
 
@@ -217,6 +228,7 @@ class MLBSession(object):
 
     @property
     def access_token(self):
+        logger.debug("getting access token")
         if not self._state.access_token:
             headers = {
                 "Authorization": "Bearer %s" %(self.client_api_key),
@@ -243,6 +255,7 @@ class MLBSession(object):
             self._state.access_token = token_response["access_token"]
 
         self.save()
+        logger.debug("access_token: %s" %(self._state.access_token))
         return self._state.access_token
 
     def content(self, game_id):
@@ -260,15 +273,17 @@ class MLBSession(object):
             start=None,
             end=None,
             game_type=None,
-            game_id=None
+            team_id=None,
+            game_id=None,
     ):
 
         logger.debug(
-            "getting schedule: %s, %s, %s, %s, %s" %(
+            "getting schedule: %s, %s, %s, %s, %s, %s" %(
                 sport_id,
                 start,
                 end,
                 game_type,
+                team_id,
                 game_id
             )
         )
@@ -277,6 +292,7 @@ class MLBSession(object):
             start = start.strftime("%Y-%m-%d") if start else "",
             end = end.strftime("%Y-%m-%d") if end else "",
             game_type = game_type if game_type else "",
+            team_id = team_id if team_id else "",
             game_id = game_id if game_id else ""
         )
         return self.session.get(url).json()
@@ -286,8 +302,9 @@ class MLBSession(object):
                   title="MLBTV",
                   preferred_stream=None):
 
+        logger.debug("geting media for game %d" %(game_id))
         schedule = self.schedule(game_id=game_id)
-        # logger.debug(schedule)
+        # raise Exception(schedule)
         try:
             game = schedule["dates"][0]["games"][0]
         except KeyError:
@@ -297,20 +314,22 @@ class MLBSession(object):
             if title in [None, epg["title"]]:
                 for item in epg["items"]:
                     if preferred_stream in [None, item["mediaFeedType"]]:
+                        logger.debug("found preferred stream")
                         yield item
                 else:
                     if len(epg["items"]):
+                        logger.debug("using non-preferred stream")
                         yield epg["items"][0]
-        raise StopIteration
+        # raise StopIteration
 
-    def get_stream(self, game_id):
+    def get_stream(self, media_id):
 
-        try:
-            media = next(self.get_media(game_id))
-        except StopIteration:
-            logger.debug("no media for stream")
-            return
-        media_id = media["mediaId"]
+        # try:
+        #     media = next(self.get_media(game_id))
+        # except StopIteration:
+        #     logger.debug("no media for stream")
+        #     return
+        # media_id = media["mediaId"]
 
         headers={
             "Authorization": self.access_token,
@@ -324,6 +343,7 @@ class MLBSession(object):
             STREAM_URL_TEMPLATE.format(media_id=media_id),
             headers=headers
         ).json()
+        logger.debug("stream response: %s" %(stream))
         if "errors" in stream and len(stream["errors"]):
             return None
         return stream
