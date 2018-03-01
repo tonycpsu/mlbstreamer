@@ -96,7 +96,7 @@ def main():
     parser.add_argument("-o", "--output_file", help="save stream to file")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="verbose logging")
-    parser.add_argument("game", metavar="game",
+    parser.add_argument("game", metavar="game", nargs="?",
                         help="team abbreviation or MLB game ID")
     options, args = parser.parse_known_args()
 
