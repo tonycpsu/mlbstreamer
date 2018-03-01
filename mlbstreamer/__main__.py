@@ -163,6 +163,8 @@ class GamesDataTable(DataTable):
         self.sport_id = sport_id
         self.game_date = game_date
         self.game_type = game_type
+
+        self.line_score_table = None
         if not self.game_type:
             self.game_type = ""
         super(GamesDataTable, self).__init__(*args, **kwargs)
@@ -207,17 +209,18 @@ class GamesDataTable(DataTable):
                     set(config.settings.get("hide_spoiler_teams", [])))
 
                 if len(g["linescore"]["innings"]):
-                    line_score = urwid.BoxAdapter(
-                        LineScoreDataTable.from_mlb_api(
+                    self.line_score_table = LineScoreDataTable.from_mlb_api(
                             g["linescore"],
                             g["teams"]["away"]["team"]["abbreviation"],
                             g["teams"]["home"]["team"]["abbreviation"],
                             hide_spoilers
-                        ),
+                    )
+                    self.line_score = urwid.BoxAdapter(
+                        self.line_score_table,
                         3
                     )
                 else:
-                    line_score = None
+                    self.line_score = None
                 yield dict(
                     game_id = game_pk,
                     game_type = game_type,
@@ -228,7 +231,7 @@ class GamesDataTable(DataTable):
                         start_time.minute,
                         "p" if start_time.hour >= 12 else "a"
                     ),
-                    line = line_score
+                    line = self.line_score
                 )
 
 
@@ -337,37 +340,10 @@ def main():
 
     state.session = MLBSession.get()
 
-    entries = {
-        "dropdown_text": PaletteEntry(
-            foreground = "light gray",
-            background = "dark blue",
-            foreground_high = "light gray",
-            background_high = "#003",
-        ),
-        "dropdown_focused": PaletteEntry(
-            foreground = "white",
-            background = "light blue",
-            foreground_high = "white",
-            background_high = "#009",
-        ),
-        "dropdown_highlight": PaletteEntry(
-            foreground = "yellow",
-            background = "light blue",
-            foreground_high = "yellow",
-            background_high = "#009",
-        ),
-        "dropdown_label": PaletteEntry(
-            foreground = "white",
-            background = "black"
-        ),
-        "dropdown_prompt": PaletteEntry(
-            foreground = "light blue",
-            background = "black"
-        ),
-    }
-
-    entries = DataTable.get_palette_entries(user_entries=entries)
-    # raise Exception(entries["dropdown_text"])
+    entries = Dropdown.get_palette_entries()
+    entries.update(ScrollingListBox.get_palette_entries())
+    entries.update(DataTable.get_palette_entries())
+    # raise Exception(entries)
     palette = Palette("default", **entries)
     screen = urwid.raw_display.Screen()
     screen.set_terminal_properties(256)
