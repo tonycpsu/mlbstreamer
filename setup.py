@@ -39,12 +39,12 @@ setup(name=name,
           'gui':  [
               "urwid",
               "urwid_utils==0.0.5a",
-              "panwid==0.2.0dev",
+              "panwid==0.2.1",
           ],
       },
       dependency_links=[
           "https://github.com/tonycpsu/urwid_utils/tarball/master#egg=urwid_utils-0.0.5a",
-          "https://github.com/tonycpsu/panwid/tarball/master#egg=panwid-0.2.0dev",
+          "https://github.com/tonycpsu/panwid/tarball/master#egg=panwid-0.2.1",
       ],
       entry_points = {
           "console_scripts": [
