@@ -93,7 +93,7 @@ def main():
         logger.addHandler(logging.NullHandler())
 
     config.settings.load()
-    state.session = MLBSession.get()
+    state.session = MLBSession.new()
 
     proc = play_stream(options.game_id, options.resolution)
     proc.wait()

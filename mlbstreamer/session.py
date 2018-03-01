@@ -99,7 +99,7 @@ class MLBSession(object):
         return self._state.password
 
     @classmethod
-    def get(cls):
+    def new(cls):
         try:
             return cls.load()
         except:

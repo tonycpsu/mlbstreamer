@@ -345,7 +345,7 @@ def main():
     logger.debug("mlbstreamer starting")
     config.settings.load()
 
-    state.session = MLBSession.get()
+    state.session = MLBSession.new()
 
     entries = Dropdown.get_palette_entries()
     entries.update(ScrollingListBox.get_palette_entries())
