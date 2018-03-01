@@ -176,19 +176,9 @@ class GamesDataTable(DataTable):
             self.game_type = ""
         super(GamesDataTable, self).__init__(*args, **kwargs)
 
-    def keypress(self, size, key):
-
-        key = super(GamesDataTable, self).keypress(size, key)
-        if key in ["left", "right"]:
-            self.game_date += timedelta(days= -1 if key == "left" else 1)
-            self.reset()
-        elif key == "t":
-            self.game_date = datetime.now().date()
-            self.reset()
-        elif key == "w":
-            self._emit("watch", self.selection.data.game_id)
-        else:
-            return key
+    def set_game_date(self, game_date):
+        self.game_date = game_date
+        self.reset()
 
     def query(self, *args, **kwargs):
 
@@ -288,29 +278,63 @@ class Toolbar(urwid.WidgetWrap):
     def start_from_beginning(self):
         return self.live_stream_dropdown.selected_label == "from beginning"
 
+class DateBar(urwid.WidgetWrap):
+
+    def __init__(self, game_date):
+        self.text = urwid.Text(game_date.strftime("%A, %Y-%m-%d"))
+        self.fill = urwid.Filler(self.text)
+        super(DateBar, self).__init__(self.fill)
+
+    def set_date(self, game_date):
+        self.text.set_text(game_date.strftime("%A, %Y-%m-%d"))
+
 class ScheduleView(urwid.WidgetWrap):
 
     def __init__(self):
 
         today = datetime.now().date()
+        self.game_date = today
         self.toolbar = Toolbar()
-        self.table = GamesDataTable(self.toolbar.sport_id, today) # preseason
+        self.datebar = DateBar(self.game_date)
+        self.table = GamesDataTable(self.toolbar.sport_id, self.game_date) # preseason
         urwid.connect_signal(self.table, "watch",
                              lambda dsource, game_id: self.watch(game_id))
         self.pile  = urwid.Pile([
             (1, self.toolbar),
+            (1, self.datebar),
             ("weight", 1, self.table)
         ])
-        self.pile.focus_position = 1
+        self.pile.focus_position = 2
         super(ScheduleView, self).__init__(self.pile)
+
+    def keypress(self, size, key):
+
+        key = super(ScheduleView, self).keypress(size, key)
+        if key in ["left", "right"]:
+            self.game_date += timedelta(days= -1 if key == "left" else 1)
+            self.datebar.set_date(self.game_date)
+            self.table.set_game_date(self.game_date)
+        elif key == "t":
+            self.game_date = datetime.now().date()
+            self.datebar.set_date(self.game_date)
+            self.table.set_game_date(self.game_date)
+        elif key == "w":
+            # self._emit("watch", self.table.selection.data.game_id)
+            self.watch(self.table.selection.data.game_id)
+        else:
+            return key
+
 
     def watch(self, game_id):
         logger.info("playing game %d at %s" %(game_id, self.toolbar.resolution))
-        play.play_stream(
-            game_id,
-            self.toolbar.resolution,
-            self.toolbar.start_from_beginning,
-        )
+        try:
+            state.proc = play.play_stream(
+                game_id,
+                self.toolbar.resolution,
+                self.toolbar.start_from_beginning,
+            )
+        except play.MLBPlayException as e:
+            logger.error(e)
 
 
 def main():

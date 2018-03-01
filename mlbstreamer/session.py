@@ -113,6 +113,13 @@ class MLBSession(object):
                        password=config.settings.password)
 
     @classmethod
+    def destroy(cls):
+        if os.path.exists(COOKIE_FILE):
+            os.remove(COOKIE_FILE)
+        if os.path.exists(SESSION_FILE):
+            os.remove(SESSION_FILE)
+
+    @classmethod
     def load(cls):
         state = yaml.load(open(SESSION_FILE), Loader=AttrDictYAMLLoader)
         return cls(**state)
@@ -153,7 +160,7 @@ class MLBSession(object):
             headers={"Referer": (initial_url)}
         )
 
-        if not self.ipid and self.fingerprint:
+        if not (self.ipid and self.fingerprint):
             raise MLBSessionException("Couldn't get ipid / fingerprint")
 
         logger.debug("logged in: %s" %(self.ipid))

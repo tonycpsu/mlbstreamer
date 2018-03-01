@@ -15,13 +15,15 @@ from prompt_toolkit.shortcuts import confirm
 from prompt_toolkit.shortcuts import prompt
 import getpass
 
-settings = None
-
 CONFIG_DIR=os.path.expanduser("~/.config/mlbstreamer")
 CONFIG_FILE=os.path.join(CONFIG_DIR, "config.yaml")
 LOG_FILE=os.path.join(CONFIG_DIR, "mlbstreamer.log")
 
 KNOWN_PLAYERS = ["mpv", "vlc"]
+
+settings = None
+
+from .session import MLBSession, MLBSessionException
 
 class NotEmptyValidator(Validator):
 
@@ -85,12 +87,14 @@ class Config(MutableMapping):
                 if player:
                     yield player
 
+        MLBSession.destroy()
+        if os.path.exists(CONFIG_FILE):
+            os.remove(CONFIG_FILE)
+
         self._config = AttrDict()
         time_zone = None
         player = None
         mkdir_p(CONFIG_DIR)
-
-        from .session import MLBSession, MLBSessionException
 
         while True:
             self.username = prompt(
@@ -101,9 +105,11 @@ class Config(MutableMapping):
                 is_password=True, validator=NotEmptyValidator())
             try:
                 s = MLBSession(self.username, self.password)
+                s.login()
                 break
             except MLBSessionException:
-                raise
+                print("Couldn't login to MLB, please check your credentials.")
+                continue
 
         tz_local = tzlocal.get_localzone().zone
 
@@ -158,10 +164,8 @@ class Config(MutableMapping):
         self.save()
 
     def load(self):
-
         if not os.path.exists(self._config_file):
-            print("config file %s not found, initializing config" %(CONFIG_FILE))
-            self.init_config()
+            raise Exception("config file %s not found" %(CONFIG_FILE))
 
         config = yaml.load(open(self._config_file), Loader=AttrDictYAMLLoader)
         if config.get("time_zone"):
@@ -203,7 +207,5 @@ settings = Config(CONFIG_FILE)
 __all__ = [
     "CONFIG_DIR",
     "config",
-    "load_config",
-    "save_config",
-    "init_config",
+    "settings"
 ]

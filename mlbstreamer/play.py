@@ -39,7 +39,11 @@ def play_stream(game_id, resolution, live_from_beginning=False):
     media_state = media["mediaState"]
 
     stream = state.session.get_stream(media_id)
-    media_url = stream["stream"]["complete"]
+    try:
+        media_url = stream["stream"]["complete"]
+    except TypeError:
+        raise MLBPlayException("no stream URL for game %d" %(game_id))
+
 
     if live_from_beginning and media_state == "MEDIA_ON": # live stream
         game = state.session.schedule(game_id)["dates"][0]["games"][0]
@@ -96,7 +100,9 @@ def main():
     parser.add_argument("-o", "--output_file", help="save stream to file")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="verbose logging")
-    parser.add_argument("game", metavar="game", nargs="?",
+    parser.add_argument("--init-config", help="initialize configuration", action="store_true")
+    parser.add_argument("game", metavar="game",
+                        nargs="?" if "--init-config" in sys.argv else 1,
                         help="team abbreviation or MLB game ID")
     options, args = parser.parse_known_args()
 
@@ -111,7 +117,11 @@ def main():
     else:
         logger.addHandler(logging.NullHandler())
 
+    if options.init_config:
+        config.settings.init_config()
+        sys.exit(0)
     config.settings.load()
+
     state.session = MLBSession.new()
 
     if options.game.isdigit():
