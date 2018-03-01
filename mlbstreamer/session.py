@@ -287,7 +287,7 @@ class MLBSession(object):
                   preferred_stream=None):
 
         schedule = self.schedule(game_id=game_id)
-        logger.debug(schedule)
+        # logger.debug(schedule)
         try:
             game = schedule["dates"][0]["games"][0]
         except KeyError:

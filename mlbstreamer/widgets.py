@@ -1,34 +1,33 @@
 import urwid
 import panwid
+from . import state
 
-class ScrollbackListBox(urwid.WidgetWrap):
+class ScrollbackListBox(panwid.listbox.ScrollingListBox):
 
     signals = ["updated"]
 
-    def __init__(self, update_interval=1):
-        self.update_interval = update_interval
-        self._results = ScrollbackListWalker(1000)
-        self._fields = []
-        # self.lock = threading.Lock()
-        self.collapsed = True
-        self.hidefields = []
-        self.filters = []
-        self.pattern = None
-        self.updated = False
-        self.update_timer = None
-        self._listbox = urwid.ListBox(self._results)
-        urwid.WidgetWrap.__init__(self, self._listbox)
+    # def __init__(self, update_interval=1):
+    #     self.update_interval = update_interval
+    #     self._results = ScrollbackListWalker(1000)
+    #     self._fields = []
+    #     # self.lock = threading.Lock()
+    #     self.collapsed = True
+    #     self.hidefields = []
+    #     self.filters = []
+    #     self.pattern = None
+    #     self.updated = False
+    #     self.update_timer = None
+    #     self._listbox = urwid.ListBox(self._results)
+    #     urwid.WidgetWrap.__init__(self, self._listbox)
 
     def _modified(self):
-        self._listbox.body._modified()
+        self.body._modified()
 
-    def append(self, label):
+    def append(self, text):
 
-        result = urwid.Text(label)
-        self._results.append(result)
-        self._listbox._invalidate()
+        result = urwid.Text(text)
+        self.body.append(result)
         self.on_updated()
-
 
     def keypress(self, size, key):
 
@@ -50,13 +49,13 @@ class ScrollbackListBox(urwid.WidgetWrap):
                 self._listbox._invalidate()
         return super(ScrollbackListBox, self).keypress(size, key)
 
-    def clear(self):
-        self._results.reset()
+    # def clear(self):
+    #     self._results.reset()
 
     def on_updated(self):
-        self.set_focus(len(self._results)-1)
         self._invalidate()
-        state.loop.draw_screen()
+        self.set_focus(len(self.body)-1)
+        # state.loop.draw_screen()
 
     def selectable(self):
         return True
@@ -68,11 +67,12 @@ class ConsoleWindow(urwid.WidgetWrap):
 
         # self.fd = fd
         self.verbose = verbose
-        self.listbox =  panwid.listbox.ScrollingListBox([], with_scrollbar=True)
+        self.listbox =  ScrollbackListBox([], with_scrollbar=True)
         super(ConsoleWindow, self).__init__(self.listbox)
 
     def log_message(self, msg):
-        self.listbox.body.append(urwid.Text(msg.rstrip()))
+        self.listbox.append(msg.rstrip())
+        self.listbox._modified()
 
     def mark(self):
         self.log_message("-" * 80)

@@ -142,6 +142,13 @@ class LineScoreDataTable(DataTable):
         # raise Exception([c.name for c in columns])
         return cls(columns, data=data)
 
+    def keypress(self, size, key):
+        key = super(LineScoreDataTable, self).keypress(size, key)
+        if key == "l":
+            logger.debug("enable")
+            self.line_score_table.enable_cell_selection()
+        return key
+
 
 
 class GamesDataTable(DataTable):
