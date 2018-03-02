@@ -1,7 +1,11 @@
+from __future__ import unicode_literals
 import os
 import errno
 import pytz
-from collections.abc import MutableMapping
+try:
+    from collections.abc import MutableMapping
+except ImportError:
+    from collections import MutableMapping
 import yaml
 from orderedattrdict import AttrDict
 import orderedattrdict.yamlutils
@@ -23,7 +27,6 @@ KNOWN_PLAYERS = ["mpv", "vlc"]
 
 settings = None
 
-from .session import MLBSession, MLBSessionException
 
 class NotEmptyValidator(Validator):
 
@@ -73,6 +76,8 @@ class Config(MutableMapping):
         self._config_file = config_file
 
     def init_config(self):
+
+        from .session import MLBSession, MLBSessionException
 
         def mkdir_p(path):
             try:

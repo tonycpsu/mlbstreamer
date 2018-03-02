@@ -316,7 +316,7 @@ class MLBSession(object):
             game = schedule["dates"][0]["games"][0]
         except KeyError:
             logger.debug("no game data")
-            return None
+            return
         for epg in game["content"]["media"]["epg"]:
             if title in [None, epg["title"]]:
                 for item in epg["items"]:
