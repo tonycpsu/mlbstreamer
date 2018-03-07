@@ -96,11 +96,13 @@ def main():
     parser.add_argument("-b", "--beginning",
                         help="play live streams from beginning",
                         action="store_true")
-    parser.add_argument("-r", "--resolution", help="stream resolution", default="720p")
+    parser.add_argument("-r", "--resolution", help="stream resolution",
+                        default="720p")
     parser.add_argument("-o", "--output_file", help="save stream to file")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="verbose logging")
-    parser.add_argument("--init-config", help="initialize configuration", action="store_true")
+    parser.add_argument("--init-config", help="initialize configuration",
+                        action="store_true")
     parser.add_argument("game", metavar="game",
                         nargs="?",
                         help="team abbreviation or MLB game ID")
@@ -124,6 +126,8 @@ def main():
 
     state.session = MLBSession.new()
 
+    if not options.game:
+        parser.error("option game")
     if options.game.isdigit():
         game_id = int(options.game)
     else:
