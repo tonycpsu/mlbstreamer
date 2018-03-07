@@ -102,7 +102,6 @@ def main():
                         help="verbose logging")
     parser.add_argument("--init-config", help="initialize configuration", action="store_true")
     parser.add_argument("game", metavar="game",
-                        nargs="?",
                         help="team abbreviation or MLB game ID")
     options, args = parser.parse_known_args()
 
