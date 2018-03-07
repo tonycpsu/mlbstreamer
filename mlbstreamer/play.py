@@ -124,10 +124,11 @@ def main():
         sys.exit(0)
     config.settings.load()
 
-    state.session = MLBSession.new()
-
     if not options.game:
         parser.error("option game")
+
+    state.session = MLBSession.new()
+
     if options.game.isdigit():
         game_id = int(options.game)
     else:
