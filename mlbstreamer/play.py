@@ -3,11 +3,10 @@ import logging
 logger = logging.getLogger(__name__)
 
 import os
-# import sys
-# import re
+import pytz
 import subprocess
 import argparse
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import dateutil.parser
 
@@ -19,7 +18,7 @@ class MLBPlayException(Exception):
     pass
 
 def play_stream(game_id, resolution,
-                live_from_beginning=False,
+                offset_from_beginning=None,
                 output=None):
 
     live = False
@@ -41,12 +40,15 @@ def play_stream(game_id, resolution,
         raise MLBPlayException("no stream URL for game %d" %(game_id))
 
 
-    if live_from_beginning and media_state == "MEDIA_ON": # live stream
-        game = state.session.schedule(game_id)["dates"][0]["games"][0]
+    if (offset_from_beginning is not None
+        and media_state == "MEDIA_ON"): # live stream
+        # game = state.session.schedule(game_id)["dates"][0]["games"][0]
+        game = state.session.schedule(game_id=game_id)["dates"][0]["games"][0]
         start_time = dateutil.parser.parse(game["gameDate"])
         # calculate HLS offset, which is negative from end of stream
         # for live streams
         offset =  datetime.now(pytz.utc) - (start_time.astimezone(pytz.utc))
+        offset += timedelta(minutes=-(offset_from_beginning))
         hours, remainder = divmod(offset.seconds, 3600)
         minutes, seconds = divmod(remainder, 60)
         offset = "%d:%02d:%02d" %(hours, minutes, seconds)
@@ -93,7 +95,9 @@ def main():
                         default=today)
     parser.add_argument("-b", "--beginning",
                         help="play live streams from beginning",
-                        action="store_true")
+                        nargs="?", metavar="offset_from_game_start",
+                        type=int,
+                        const=-10)
     parser.add_argument("-r", "--resolution", help="stream resolution",
                         default="720p")
     parser.add_argument("-s", "--save-stream", help="save stream to file",
@@ -156,7 +160,7 @@ def main():
         proc = play_stream(
             game_id,
             options.resolution,
-            live_from_beginning = options.beginning,
+            offset_from_beginning = options.beginning,
             output=options.save_stream
         )
         proc.wait()
