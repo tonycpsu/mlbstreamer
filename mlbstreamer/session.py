@@ -18,6 +18,8 @@ from orderedattrdict import AttrDict
 import orderedattrdict.yamlutils
 from orderedattrdict.yamlutils import AttrDictYAMLLoader
 import pytz
+import datetime
+import dateutil.parser
 
 from . import config
 from . import state
@@ -73,6 +75,7 @@ class MLBSession(object):
             client_api_key=None,
             token=None,
             access_token=None,
+            access_token_expiry=None
     ):
 
         self.session = requests.Session()
@@ -88,6 +91,7 @@ class MLBSession(object):
             ("client_api_key", client_api_key),
             ("token", token),
             ("access_token", access_token),
+            ("access_token_expiry", access_token_expiry)
         ])
         self.login()
 
@@ -233,37 +237,66 @@ class MLBSession(object):
             self._state.token = response.text
         return self._state.token
 
+    @token.setter
+    def token(self, value):
+        self._state.token = value
+
+    @property
+    def access_token_expiry(self):
+
+        if self._state.access_token_expiry:
+            return dateutil.parser.parse(self._state.access_token_expiry)
+
+    @access_token_expiry.setter
+    def access_token_expiry(self, val):
+        if val:
+            self._state.access_token_expiry = val.isoformat()
+
     @property
     def access_token(self):
         logger.debug("getting access token")
-        if not self._state.access_token:
-            headers = {
-                "Authorization": "Bearer %s" %(self.client_api_key),
-                "User-agent": USER_AGENT,
-                "Accept": "application/vnd.media-service+json; version=1",
-                "x-bamsdk-version": BAM_SDK_VERSION,
-                "x-bamsdk-platform": PLATFORM,
-                "origin": "https://www.mlb.com"
-            }
+        if not self._state.access_token or not self.access_token_expiry or \
+                self.access_token_expiry < datetime.datetime.now(tz=pytz.UTC):
 
-            data={
-                "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
-                "platform": "browser",
-                "setCookie": "false",
-                "subject_token": self.token,
-                "subject_token_type": "urn:ietf:params:oauth:token-type:jwt"
-            }
-            response = self._access_token = self.session.post(
-                ACCESS_TOKEN_URL,
-                data=data,
-                headers=headers
-            )
-            token_response = response.json()
-            self._state.access_token = token_response["access_token"]
+            try:
+                self._state.access_token, self.access_token_expiry = self._get_access_token()
+            except requests.exceptions.HTTPError:
+                # Clear token and then try to get a new access_token
+                self.token = None
+                self._state.access_token, self.access_token_expiry = self._get_access_token()
 
         self.save()
         logger.debug("access_token: %s" %(self._state.access_token))
         return self._state.access_token
+
+    def _get_access_token(self):
+        headers = {
+            "Authorization": "Bearer %s" % (self.client_api_key),
+            "User-agent": USER_AGENT,
+            "Accept": "application/vnd.media-service+json; version=1",
+            "x-bamsdk-version": BAM_SDK_VERSION,
+            "x-bamsdk-platform": PLATFORM,
+            "origin": "https://www.mlb.com"
+        }
+        data = {
+            "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
+            "platform": "browser",
+            "setCookie": "false",
+            "subject_token": self.token,
+            "subject_token_type": "urn:ietf:params:oauth:token-type:jwt"
+        }
+        response = self.session.post(
+            ACCESS_TOKEN_URL,
+            data=data,
+            headers=headers
+        )
+        response.raise_for_status()
+        token_response = response.json()
+
+        token_expiry = datetime.datetime.now(tz=pytz.UTC) + \
+                       datetime.timedelta(seconds=token_response["expires_in"])
+
+        return token_response["access_token"], token_expiry
 
     def content(self, game_id):
 
