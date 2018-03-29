@@ -18,27 +18,23 @@ from .session import *
 class MLBPlayException(Exception):
     pass
 
-def play_stream(game_id, resolution, live_from_beginning=False):
+def play_stream(game_id, resolution,
+                live_from_beginning=False,
+                output=None):
 
     live = False
     offset = None
-
-    # stream = state.session.get_stream(game_id)
-    # if not stream:
-    #     raise MLBPlayException("no matching media for game %d" %(game_id))
-    # logger.debug(stream)
-    # url = stream["stream"]["complete"]
 
     try:
         media = next(state.session.get_media(game_id))
     except StopIteration:
         raise MLBPlayException("no matching media for game %d" %(game_id))
 
-
     media_id = media["mediaId"]
     media_state = media["mediaState"]
 
     stream = state.session.get_stream(media_id)
+
     try:
         media_url = stream["stream"]["complete"]
     except TypeError:
@@ -48,8 +44,6 @@ def play_stream(game_id, resolution, live_from_beginning=False):
     if live_from_beginning and media_state == "MEDIA_ON": # live stream
         game = state.session.schedule(game_id)["dates"][0]["games"][0]
         start_time = dateutil.parser.parse(game["gameDate"])
-        # print(start_time)
-        # print(datetime.now(pytz.utc))
         # calculate HLS offset, which is negative from end of stream
         # for live streams
         offset =  datetime.now(pytz.utc) - (start_time.astimezone(pytz.utc))
@@ -70,9 +64,13 @@ def play_stream(game_id, resolution, live_from_beginning=False):
     if offset:
         cmd += ["--hls-start-offset", offset]
     logger.debug(" ".join(cmd))
-    # if options.output_file:
-    #     cmd += ["-o", options.output_file]
 
+    if output is not None:
+        if output == True:
+            outfile = "mlb.%d.%s.mp4" %(game_id, resolution)
+        else:
+            outfile = output
+        cmd += ["-o", outfile]
 
     logger.debug(cmd)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
@@ -98,7 +96,8 @@ def main():
                         action="store_true")
     parser.add_argument("-r", "--resolution", help="stream resolution",
                         default="720p")
-    parser.add_argument("-o", "--output_file", help="save stream to file")
+    parser.add_argument("-s", "--save-stream", help="save stream to file",
+                        nargs="?", const=True)
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="verbose logging")
     parser.add_argument("--init-config", help="initialize configuration",
@@ -157,7 +156,9 @@ def main():
         proc = play_stream(
             game_id,
             options.resolution,
-            live_from_beginning = options.beginning)
+            live_from_beginning = options.beginning,
+            output=options.save_stream
+        )
         proc.wait()
     except MLBPlayException as e:
         logger.error(e)
