@@ -40,7 +40,7 @@ setup(name=name,
           'gui':  [
               "urwid",
               "urwid_utils==0.1.1.dev0",
-              "panwid==0.2.1",
+              "panwid==0.2.2.dev5",
           ],
       },
       dependency_links=[
