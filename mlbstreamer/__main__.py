@@ -205,7 +205,7 @@ class GamesDataTable(DataTable):
                 hide_spoilers = set([away_abbrev, home_abbrev]).intersection(
                     set(config.settings.get("hide_spoiler_teams", [])))
 
-                if len(g["linescore"]["innings"]):
+                if "linescore" in g and len(g["linescore"]["innings"]):
                     self.line_score_table = LineScoreDataTable.from_mlb_api(
                             g["linescore"],
                             g["teams"]["away"]["team"]["abbreviation"],
