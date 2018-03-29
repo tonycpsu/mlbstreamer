@@ -39,7 +39,7 @@ setup(name=name,
       extras_require={
           'gui':  [
               "urwid",
-              "urwid_utils==0.0.5a",
+              "urwid_utils==0.1.1.dev0",
               "panwid==0.2.1",
           ],
       },
