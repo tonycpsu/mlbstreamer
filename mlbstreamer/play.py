@@ -7,6 +7,7 @@ import pytz
 import subprocess
 import argparse
 from datetime import datetime, timedelta
+import pytz
 
 import dateutil.parser
 
@@ -87,7 +88,7 @@ def valid_date(s):
 
 def main():
 
-    today = datetime.now().date()
+    today = datetime.now(pytz.timezone('US/Eastern')).date() 
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--date", help="game date",
