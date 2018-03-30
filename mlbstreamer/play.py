@@ -148,6 +148,11 @@ def main():
             team["fileCode"]: team["id"]
             for team in state.session.get(teams_url).json()["teams"]
         }
+
+        if options.game not in teams:
+            print("'%s' not a valid team code, must be one of:\n%s" % (options.game, " ".join(teams)))
+            sys.exit(1)
+
         schedule = state.session.schedule(
             start = options.date,
             end = options.date,
