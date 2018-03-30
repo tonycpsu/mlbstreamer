@@ -150,11 +150,6 @@ class Config(MutableMapping):
             player = " ".join([player, player_args])
 
         self.player = player
-	
-        streamlink_args = prompt(
-            "If you need to pass additional arguments to streamlink"
-            ", enter them here: ")
-        self.streamlink_args = streamlink_args
 
         print("Your system time zone seems to be %s." %(tz_local))
         if not confirm("Is that the time zone you'd like to use? (y/n) "):
