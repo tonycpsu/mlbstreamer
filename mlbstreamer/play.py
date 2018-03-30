@@ -63,6 +63,8 @@ def play_stream(game_id, resolution,
         media_url,
         resolution,
     ]
+    if config.settings.streamlink_args:
+	    cmd +=[config.settings.streamlink_args]
     if offset:
         cmd += ["--hls-start-offset", offset]
     logger.debug(" ".join(cmd))
