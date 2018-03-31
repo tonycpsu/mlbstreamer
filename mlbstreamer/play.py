@@ -20,13 +20,15 @@ class MLBPlayException(Exception):
 
 def play_stream(game_id, resolution,
                 offset_from_beginning=None,
+                preferred_stream=None,
                 output=None):
 
     live = False
     offset = None
 
     try:
-        media = next(state.session.get_media(game_id))
+        media = next(state.session.get_media(game_id,
+                                             preferred_stream=preferred_stream))
     except StopIteration:
         raise MLBPlayException("no matching media for game %d" %(game_id))
 
@@ -133,6 +135,7 @@ def main():
 
     state.session = MLBSession.new()
 
+    preferred_stream = None
     if options.game.isdigit():
         game_id = int(options.game)
     else:
@@ -162,13 +165,20 @@ def main():
             sport_id = 1,
             team_id = teams[options.game]
         )
-        game_id = schedule["dates"][0]["games"][0]["gamePk"]
+        game = schedule["dates"][0]["games"][0]
+        game_id = game["gamePk"]
+        preferred_stream = (
+            "HOME"
+            if options.game == game["teams"]["home"]["team"]["fileCode"]
+            else "AWAY"
+        )
 
     try:
         proc = play_stream(
             game_id,
             options.resolution,
             offset_from_beginning = options.beginning,
+            preferred_stream = preferred_stream,
             output=options.save_stream
         )
         proc.wait()
