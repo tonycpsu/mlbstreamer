@@ -7,6 +7,7 @@ import pytz
 import subprocess
 import argparse
 from datetime import datetime, timedelta
+import pytz
 
 import dateutil.parser
 
@@ -19,13 +20,15 @@ class MLBPlayException(Exception):
 
 def play_stream(game_id, resolution,
                 offset_from_beginning=None,
+                preferred_stream=None,
                 output=None):
 
     live = False
     offset = None
 
     try:
-        media = next(state.session.get_media(game_id))
+        media = next(state.session.get_media(game_id,
+                                             preferred_stream=preferred_stream))
     except StopIteration:
         raise MLBPlayException("no matching media for game %d" %(game_id))
 
@@ -40,19 +43,20 @@ def play_stream(game_id, resolution,
         raise MLBPlayException("no stream URL for game %d" %(game_id))
 
 
-    if (offset_from_beginning is not None
-        and media_state == "MEDIA_ON"): # live stream
-        # game = state.session.schedule(game_id)["dates"][0]["games"][0]
-        game = state.session.schedule(game_id=game_id)["dates"][0]["games"][0]
-        start_time = dateutil.parser.parse(game["gameDate"])
-        # calculate HLS offset, which is negative from end of stream
-        # for live streams
-        offset =  datetime.now(pytz.utc) - (start_time.astimezone(pytz.utc))
-        offset += timedelta(minutes=-(offset_from_beginning))
-        hours, remainder = divmod(offset.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        offset = "%d:%02d:%02d" %(hours, minutes, seconds)
-        logger.info("starting at time offset %s" %(offset))
+    if (offset_from_beginning is not None):
+        if (media_state == "MEDIA_ON"): # live stream
+            game = state.session.schedule(game_id=game_id)["dates"][0]["games"][0]
+            start_time = dateutil.parser.parse(game["gameDate"])
+            # calculate HLS offset, which is negative from end of stream
+            # for live streams
+            offset =  datetime.now(pytz.utc) - (start_time.astimezone(pytz.utc))
+            offset += timedelta(minutes=-(offset_from_beginning))
+            hours, remainder = divmod(offset.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            offset = "%d:%02d:%02d" %(hours, minutes, seconds)
+        else:
+            offset = "0:%02d:00" %(offset_from_beginning)
+            logger.info("starting at time offset %s" %(offset))
 
     cmd = [
         "streamlink",
@@ -89,7 +93,7 @@ def valid_date(s):
 
 def main():
 
-    today = datetime.now().date()
+    today = datetime.now(pytz.timezone('US/Eastern')).date()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--date", help="game date",
@@ -134,6 +138,7 @@ def main():
 
     state.session = MLBSession.new()
 
+    preferred_stream = None
     if options.game.isdigit():
         game_id = int(options.game)
     else:
@@ -150,19 +155,33 @@ def main():
             team["fileCode"]: team["id"]
             for team in state.session.get(teams_url).json()["teams"]
         }
+
+        if options.game not in teams:
+            msg = "'%s' not a valid team code, must be one of:\n%s" %(
+                options.game, " ".join(teams)
+            )
+            raise argparse.ArgumentTypeError(msg)
+
         schedule = state.session.schedule(
             start = options.date,
             end = options.date,
             sport_id = 1,
             team_id = teams[options.game]
         )
-        game_id = schedule["dates"][0]["games"][0]["gamePk"]
+        game = schedule["dates"][0]["games"][0]
+        game_id = game["gamePk"]
+        preferred_stream = (
+            "HOME"
+            if options.game == game["teams"]["home"]["team"]["fileCode"]
+            else "AWAY"
+        )
 
     try:
         proc = play_stream(
             game_id,
             options.resolution,
             offset_from_beginning = options.beginning,
+            preferred_stream = preferred_stream,
             output=options.save_stream
         )
         proc.wait()

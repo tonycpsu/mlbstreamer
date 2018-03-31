@@ -346,7 +346,8 @@ class MLBSession(object):
         schedule = self.schedule(game_id=game_id)
         # raise Exception(schedule)
         try:
-            game = schedule["dates"][0]["games"][0]
+            # Get last date for games that have been rescheduled to a later date
+            game = schedule["dates"][-1]["games"][0]
         except KeyError:
             logger.debug("no game data")
             return
