@@ -21,7 +21,8 @@ class MLBPlayException(Exception):
 def play_stream(game_id, resolution,
                 offset_from_beginning=None,
                 preferred_stream=None,
-                output=None):
+                output=None,
+                date_json=None):
 
     live = False
     offset = None
@@ -45,7 +46,7 @@ def play_stream(game_id, resolution,
 
     if (offset_from_beginning is not None):
         if (media_state == "MEDIA_ON"): # live stream
-            game = state.session.schedule(game_id=game_id)["dates"][0]["games"][0]
+            game = get_date_json(game_id, date_json)["games"][0]
             start_time = dateutil.parser.parse(game["gameDate"])
             # calculate HLS offset, which is negative from end of stream
             # for live streams
@@ -73,7 +74,7 @@ def play_stream(game_id, resolution,
 
     if output is not None:
         if output == True:
-            outfile = "mlb.%d.%s.mp4" %(game_id, resolution)
+            outfile = get_output_filename(game_id, media, date_json, resolution)
         else:
             outfile = output
         cmd += ["-o", outfile]
@@ -81,6 +82,25 @@ def play_stream(game_id, resolution,
     logger.debug(cmd)
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     return proc
+
+def get_date_json(game_id, date_json):
+    if date_json is not None:
+        return date_json
+    return state.session.schedule(game_id=game_id)["dates"][-1]
+
+def get_output_filename(game_id, media, date, resolution):
+    try:
+        if (date is None):
+            date = state.session.schedule(game_id=game_id)["dates"][-1]
+        game = date["games"][0]
+        # Return file name in the format yyyy-mm-dd.away.vs.home-STATION-mlb.mp4
+        return "%s.%s.vs.%s-%s-mlb.mp4" \
+               % (date["date"],
+                  game["teams"]["away"]["team"]["fileCode"],
+                  game["teams"]["home"]["team"]["fileCode"],
+                  media["callLetters"])
+    except KeyError:
+        return "mlb.%d.%s.mp4" % (game_id, resolution)
 
 def valid_date(s):
     try:
@@ -137,6 +157,8 @@ def main():
     state.session = MLBSession.new()
 
     preferred_stream = None
+    date = None
+
     if options.game.isdigit():
         game_id = int(options.game)
     else:
@@ -166,7 +188,8 @@ def main():
             sport_id = 1,
             team_id = teams[options.game]
         )
-        game = schedule["dates"][0]["games"][0]
+        date = schedule["dates"][-1]
+        game = date["games"][0]
         game_id = game["gamePk"]
         preferred_stream = (
             "HOME"
@@ -180,7 +203,8 @@ def main():
             options.resolution,
             offset_from_beginning = options.beginning,
             preferred_stream = preferred_stream,
-            output=options.save_stream
+            output = options.save_stream,
+            date_json= date
         )
         proc.wait()
     except MLBPlayException as e:
