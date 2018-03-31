@@ -88,7 +88,7 @@ def valid_date(s):
 
 def main():
 
-    today = datetime.now(pytz.timezone('US/Eastern')).date() 
+    today = datetime.now(pytz.timezone('US/Eastern')).date()
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--date", help="game date",
@@ -151,7 +151,9 @@ def main():
         }
 
         if options.game not in teams:
-            msg = "'%s' not a valid team code, must be one of:\n%s" % (options.game, " ".join(teams))
+            msg = "'%s' not a valid team code, must be one of:\n%s" %(
+                options.game, " ".join(teams)
+            )
             raise argparse.ArgumentTypeError(msg)
 
         schedule = state.session.schedule(
