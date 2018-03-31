@@ -43,19 +43,20 @@ def play_stream(game_id, resolution,
         raise MLBPlayException("no stream URL for game %d" %(game_id))
 
 
-    if (offset_from_beginning is not None
-        and media_state == "MEDIA_ON"): # live stream
-        # game = state.session.schedule(game_id)["dates"][0]["games"][0]
-        game = state.session.schedule(game_id=game_id)["dates"][0]["games"][0]
-        start_time = dateutil.parser.parse(game["gameDate"])
-        # calculate HLS offset, which is negative from end of stream
-        # for live streams
-        offset =  datetime.now(pytz.utc) - (start_time.astimezone(pytz.utc))
-        offset += timedelta(minutes=-(offset_from_beginning))
-        hours, remainder = divmod(offset.seconds, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        offset = "%d:%02d:%02d" %(hours, minutes, seconds)
-        logger.info("starting at time offset %s" %(offset))
+    if (offset_from_beginning is not None):
+        if (media_state == "MEDIA_ON"): # live stream
+            game = state.session.schedule(game_id=game_id)["dates"][0]["games"][0]
+            start_time = dateutil.parser.parse(game["gameDate"])
+            # calculate HLS offset, which is negative from end of stream
+            # for live streams
+            offset =  datetime.now(pytz.utc) - (start_time.astimezone(pytz.utc))
+            offset += timedelta(minutes=-(offset_from_beginning))
+            hours, remainder = divmod(offset.seconds, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            offset = "%d:%02d:%02d" %(hours, minutes, seconds)
+        else:
+            offset = "0:%02d:00" %(offset_from_beginning)
+            logger.info("starting at time offset %s" %(offset))
 
     cmd = [
         "streamlink",
