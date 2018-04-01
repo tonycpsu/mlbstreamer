@@ -163,13 +163,17 @@ def get_output_filename(game, station, resolution):
         # game = date["games"][0]
         # Return file name in the format mlb.yyyy-mm-dd.away.vs.home.hh:mm.STATION.ts
 
-        game_date, start_time = game["gameDate"].split("T")
-        start_time = start_time.rsplit(":", 1)[0]
+        start_time = dateutil.parser.parse(
+            game["gameDate"]
+        ).astimezone(pytz.timezone("US/Eastern"))
+
+        game_date = start_time.date().strftime("%Y%m%d")
+        game_time = start_time.time().strftime("%H%M")
         return "mlb.%s.%s@%s.%s.%s.ts" \
                % (game_date,
                   game["teams"]["away"]["team"]["fileCode"],
                   game["teams"]["home"]["team"]["fileCode"],
-                  start_time,
+                  game_time,
                   station.lower()
                   )
     except KeyError:
