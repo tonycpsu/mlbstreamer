@@ -96,14 +96,14 @@ def get_output_filename(game_id, media, date, resolution):
         if (date is None):
             date = state.session.schedule(game_id=game_id)["dates"][-1]
         game = date["games"][0]
-        # Return file name in the format yyyy-mm-dd.away.vs.home-STATION-mlb.mp4
-        return "%s.%s.vs.%s-%s-mlb.mp4" \
+        # Return file name in the format yyyy-mm-dd.away.vs.home-STATION-mlb.ts
+        return "%s.%s.vs.%s-%s-mlb.ts" \
                % (date["date"],
                   game["teams"]["away"]["team"]["fileCode"],
                   game["teams"]["home"]["team"]["fileCode"],
                   media["callLetters"])
     except KeyError:
-        return "mlb.%d.%s.mp4" % (game_id, resolution)
+        return "mlb.%d.%s.ts" % (game_id, resolution)
 
 def valid_date(s):
     try:
