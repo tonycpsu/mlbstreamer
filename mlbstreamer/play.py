@@ -32,6 +32,7 @@ def play_stream(game_specifier, resolution,
     live = False
     offset = None
     team = None
+    game_number = 1
 
     if isinstance(game_specifier, int):
         game_id = game_specifier
@@ -40,7 +41,11 @@ def play_stream(game_specifier, resolution,
         )
 
     else:
-        (game_date, team) = game_specifier
+        try:
+            (game_date, team, game_number) = game_specifier
+        except ValueError:
+            (game_date, team) = game_specifier
+
         season = game_date.year
         teams_url = (
             "http://statsapi.mlb.com/api/v1/teams"
@@ -70,10 +75,12 @@ def play_stream(game_specifier, resolution,
 
     try:
         date = schedule["dates"][-1]
-        game = date["games"][0]
+        game = date["games"][game_number-1]
         game_id = game["gamePk"]
     except IndexError:
-        raise MLBPlayException("No game found for %s on %s" %(team, game_date))
+        raise MLBPlayException("No game %d found for %s on %s" %(
+            game_number, team, game_date)
+        )
 
     preferred_stream = (
         "HOME"
@@ -183,6 +190,10 @@ def main():
     parser.add_argument("-d", "--date", help="game date",
                         type=valid_date,
                         default=today)
+    parser.add_argument("-g", "--game-number",
+                        help="number of team game on date (for doubleheaders)",
+                        default=1,
+                        type=int)
     parser.add_argument("-b", "--beginning",
                         help="play live streams from beginning",
                         nargs="?", metavar="offset_from_game_start",
@@ -228,7 +239,7 @@ def main():
     if options.game.isdigit():
         game_specifier = int(options.game)
     else:
-        game_specifier = (options.date, options.game)
+        game_specifier = (options.date, options.game, options.game_number)
 
     try:
         proc = play_stream(
