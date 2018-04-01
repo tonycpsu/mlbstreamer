@@ -73,10 +73,13 @@ def play_stream(game_id, resolution,
     logger.debug(" ".join(cmd))
 
     if output is not None:
-        if output == True:
+        if output == True or os.path.isdir(output):
             outfile = get_output_filename(game_id, media, date_json, resolution)
+            if os.path.isdir(output):
+                outfile = os.path.join(output, outfile)
         else:
             outfile = output
+
         cmd += ["-o", outfile]
 
     logger.debug(cmd)
