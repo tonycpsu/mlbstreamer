@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 import pytz
 
 import dateutil.parser
+from orderedattrdict import AttrDict
 
 from . import config
 from . import state
@@ -18,7 +19,11 @@ from .session import *
 class MLBPlayException(Exception):
     pass
 
-def play_stream(game_id, resolution,
+class MLBPlayInvalidArgumentError(MLBPlayException):
+    pass
+
+
+def play_stream(game_specifier, resolution,
                 offset_from_beginning=None,
                 preferred_stream=None,
                 output=None,
@@ -26,6 +31,55 @@ def play_stream(game_id, resolution,
 
     live = False
     offset = None
+    team = None
+
+    if isinstance(game_specifier, int):
+        game_id = game_specifier
+        schedule = state.session.schedule(
+            game_id = game_id
+        )
+
+    else:
+        (game_date, team) = game_specifier
+        season = game_date.year
+        teams_url = (
+            "http://statsapi.mlb.com/api/v1/teams"
+            "?sportId={sport}&season={season}".format(
+                sport=1,
+                season=season
+            )
+        )
+        teams = AttrDict(
+            (team["fileCode"], team["id"])
+            for team in sorted(state.session.get(teams_url).json()["teams"],
+                               key=lambda t: t["fileCode"])
+        )
+
+        if team not in teams:
+            msg = "'%s' not a valid team code, must be one of:\n%s" %(
+                game_specifier, " ".join(teams)
+            )
+            raise argparse.ArgumentTypeError(msg)
+
+        schedule = state.session.schedule(
+            start = game_date,
+            end = game_date,
+            sport_id = 1,
+            team_id = teams[team]
+        )
+
+    try:
+        date = schedule["dates"][-1]
+        game = date["games"][0]
+        game_id = game["gamePk"]
+    except IndexError:
+        raise MLBPlayException("No game found for %s on %s" %(team, game_date))
+
+    preferred_stream = (
+        "HOME"
+        if team == game["teams"]["home"]["team"]["fileCode"]
+        else "AWAY"
+    )
 
     try:
         media = next(state.session.get_media(game_id,
@@ -46,17 +100,17 @@ def play_stream(game_id, resolution,
 
     if (offset_from_beginning is not None):
         if (media_state == "MEDIA_ON"): # live stream
-            game = get_date_json(game_id, date_json)["games"][0]
-            start_time = dateutil.parser.parse(game["gameDate"])
             # calculate HLS offset, which is negative from end of stream
             # for live streams
+            start_time = dateutil.parser.parse(game["gameDate"])
             offset =  datetime.now(pytz.utc) - (start_time.astimezone(pytz.utc))
             offset += timedelta(minutes=-(offset_from_beginning))
             hours, remainder = divmod(offset.seconds, 3600)
             minutes, seconds = divmod(remainder, 60)
             offset = "%d:%02d:%02d" %(hours, minutes, seconds)
         else:
-            offset = "0:%02d:00" %(offset_from_beginning)
+            td = timedelta(minutes=offset_from_beginning)
+            offset = str(td)
             logger.info("starting at time offset %s" %(offset))
 
     cmd = [
@@ -74,7 +128,11 @@ def play_stream(game_id, resolution,
 
     if output is not None:
         if output == True or os.path.isdir(output):
-            outfile = get_output_filename(game_id, media, date_json, resolution)
+            outfile = get_output_filename(
+                game,
+                media["callLetters"],
+                resolution
+            )
             if os.path.isdir(output):
                 outfile = os.path.join(output, outfile)
         else:
@@ -86,28 +144,33 @@ def play_stream(game_id, resolution,
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     return proc
 
-def get_date_json(game_id, date_json):
-    if date_json is not None:
-        return date_json
-    return state.session.schedule(game_id=game_id)["dates"][-1]
+# def get_date_json(game_id, date_json):
+#     if date_json is not None:
+#         return date_json
+#     return state.session.schedule(game_id=game_id)["dates"][-1]
 
-def get_output_filename(game_id, media, date, resolution):
+def get_output_filename(game, station, resolution):
     try:
-        if (date is None):
-            date = state.session.schedule(game_id=game_id)["dates"][-1]
-        game = date["games"][0]
-        # Return file name in the format yyyy-mm-dd.away.vs.home-STATION-mlb.ts
-        return "%s.%s.vs.%s-%s-mlb.ts" \
-               % (date["date"],
+        # if (date is None):
+        #     date = state.session.schedule(game_id=game["gamePk"])["dates"][-1]
+        # game = date["games"][0]
+        # Return file name in the format mlb.yyyy-mm-dd.away.vs.home.hh:mm.STATION.ts
+
+        game_date, start_time = game["gameDate"].split("T")
+        start_time = start_time.rsplit(":", 1)[0]
+        return "mlb.%s.%s@%s.%s.%s.ts" \
+               % (game_date,
                   game["teams"]["away"]["team"]["fileCode"],
                   game["teams"]["home"]["team"]["fileCode"],
-                  media["callLetters"])
+                  start_time,
+                  station.lower()
+                  )
     except KeyError:
-        return "mlb.%d.%s.ts" % (game_id, resolution)
+        return "mlb.%d.%s.ts" % (game["gamePk"], resolution)
 
 def valid_date(s):
     try:
-        return datetime.strptime(s, "%Y-%m-%d")
+        return datetime.strptime(s, "%Y-%m-%d").date()
     except ValueError:
         msg = "Not a valid date: '{0}'.".format(s)
         raise argparse.ArgumentTypeError(msg)
@@ -163,53 +226,21 @@ def main():
     date = None
 
     if options.game.isdigit():
-        game_id = int(options.game)
+        game_specifier = int(options.game)
     else:
-
-        season = today.year
-        teams_url = (
-            "http://statsapi.mlb.com/api/v1/teams"
-            "?sportId={sport}&season={season}".format(
-                sport=1,
-                season=season
-            )
-        )
-        teams = {
-            team["fileCode"]: team["id"]
-            for team in state.session.get(teams_url).json()["teams"]
-        }
-
-        if options.game not in teams:
-            msg = "'%s' not a valid team code, must be one of:\n%s" %(
-                options.game, " ".join(teams)
-            )
-            raise argparse.ArgumentTypeError(msg)
-
-        schedule = state.session.schedule(
-            start = options.date,
-            end = options.date,
-            sport_id = 1,
-            team_id = teams[options.game]
-        )
-        date = schedule["dates"][-1]
-        game = date["games"][0]
-        game_id = game["gamePk"]
-        preferred_stream = (
-            "HOME"
-            if options.game == game["teams"]["home"]["team"]["fileCode"]
-            else "AWAY"
-        )
+        game_specifier = (options.date, options.game)
 
     try:
         proc = play_stream(
-            game_id,
+            game_specifier,
             options.resolution,
             offset_from_beginning = options.beginning,
             preferred_stream = preferred_stream,
             output = options.save_stream,
-            date_json= date
         )
         proc.wait()
+    except MLBPlayInvalidArgumentError as e:
+        raise argparse.ArgumentTypeError(str(e))
     except MLBPlayException as e:
         logger.error(e)
 
