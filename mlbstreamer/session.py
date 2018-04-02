@@ -135,7 +135,7 @@ class MLBSession(object):
 
     def login(self):
 
-        logger.debug("logging in")
+        logger.debug("attempting to log in")
 
         initial_url = ("https://secure.mlb.com/enterworkflow.do"
                        "?flowId=registration.wizard&c_id=mlb")
@@ -154,7 +154,8 @@ class MLBSession(object):
         if self.logged_in:
             logger.debug("already logged in")
             return
-        logger.debug("logging in")
+
+        logger.debug("sucessfully logged in")
 
         login_url = "https://securea.mlb.com/authenticate.do"
 
