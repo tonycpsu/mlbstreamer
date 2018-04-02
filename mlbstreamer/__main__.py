@@ -180,6 +180,16 @@ class GamesDataTable(DataTable):
         self.game_date = game_date
         self.reset()
 
+    def format_localized_game_start_time(self, start_time):
+        if config.settings.military_time:
+            return start_time.time().strftime("%H:%M") 
+        else:
+            return "%d:%02d%s" %(
+                        start_time.hour - 12 if start_time.hour > 12 else start_time.hour,
+                        start_time.minute,
+                        "p" if start_time.hour >= 12 else "a"
+                    )
+
     def query(self, *args, **kwargs):
 
         j = state.session.schedule(
@@ -223,11 +233,7 @@ class GamesDataTable(DataTable):
                     game_type = game_type,
                     away = away_team,
                     home = home_team,
-                    start = "%d:%02d%s" %(
-                        start_time.hour - 12 if start_time.hour > 12 else start_time.hour,
-                        start_time.minute,
-                        "p" if start_time.hour >= 12 else "a"
-                    ),
+                    start = self.format_localized_game_start_time(start_time),
                     line = self.line_score
                 )
 
