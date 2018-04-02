@@ -130,10 +130,9 @@ def play_stream(game_specifier, resolution,
         resolution,
     ]
     if config.settings.streamlink_args:
-	    cmd +=config.settings.streamlink_args.split(' ')
+        cmd +=config.settings.streamlink_args.split(' ')
     if offset:
         cmd += ["--hls-start-offset", offset]
-    logger.debug(" ".join(cmd))
 
     if output is not None:
         if output == True or os.path.isdir(output):
@@ -149,7 +148,7 @@ def play_stream(game_specifier, resolution,
 
         cmd += ["-o", outfile]
 
-    logger.debug(cmd)
+    logger.debug(" ".join(cmd))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     return proc
 
