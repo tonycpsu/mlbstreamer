@@ -181,6 +181,7 @@ class GamesDataTable(DataTable):
         self.reset()
 
     def format_localized_game_start_time(self, start_time):
+        """ Formats start_time to preferred time format set by military_time flag in config """
         if config.settings.military_time:
             return start_time.time().strftime("%H:%M") 
         else:
