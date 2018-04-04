@@ -135,7 +135,6 @@ def play_stream(game_specifier, resolution,
 
     if offset:
         cmd += ["--hls-start-offset", offset]
-    logger.debug(" ".join(cmd))
 
     if output is not None:
         if output == True or os.path.isdir(output):
@@ -151,7 +150,7 @@ def play_stream(game_specifier, resolution,
 
         cmd += ["-o", outfile]
 
-    logger.debug(cmd)
+    logger.debug("Running cmd: %s" % " ".join(cmd))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     return proc
 
@@ -220,6 +219,7 @@ def main():
                         help="team abbreviation or MLB game ID")
     options, args = parser.parse_known_args()
 
+    global logger
     logger = logging.getLogger("mlbstreamer")
     if options.verbose:
         logger.setLevel(logging.DEBUG)
