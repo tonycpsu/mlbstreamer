@@ -8,6 +8,7 @@ import subprocess
 import argparse
 from datetime import datetime, timedelta
 import pytz
+import shlex
 
 import dateutil.parser
 from orderedattrdict import AttrDict
@@ -130,7 +131,8 @@ def play_stream(game_specifier, resolution,
         resolution,
     ]
     if config.settings.streamlink_args:
-	    cmd +=config.settings.streamlink_args.split(' ')
+	cmd += shlex.split(config.settings.streamlink_args)
+
     if offset:
         cmd += ["--hls-start-offset", offset]
     logger.debug(" ".join(cmd))
