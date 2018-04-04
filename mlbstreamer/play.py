@@ -8,6 +8,7 @@ import subprocess
 import argparse
 from datetime import datetime, timedelta
 import pytz
+import shlex
 
 import dateutil.parser
 from orderedattrdict import AttrDict
@@ -130,7 +131,8 @@ def play_stream(game_specifier, resolution,
         resolution,
     ]
     if config.settings.streamlink_args:
-        cmd +=config.settings.streamlink_args.split(' ')
+        cmd += shlex.split(config.settings.streamlink_args)
+
     if offset:
         cmd += ["--hls-start-offset", offset]
 
@@ -148,7 +150,7 @@ def play_stream(game_specifier, resolution,
 
         cmd += ["-o", outfile]
 
-    logger.debug(" ".join(cmd))
+    logger.debug("Running cmd: %s" % " ".join(cmd))
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     return proc
 
@@ -217,6 +219,7 @@ def main():
                         help="team abbreviation or MLB game ID")
     options, args = parser.parse_known_args()
 
+    global logger
     logger = logging.getLogger("mlbstreamer")
     if options.verbose:
         logger.setLevel(logging.DEBUG)
