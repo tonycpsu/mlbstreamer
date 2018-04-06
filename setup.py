@@ -37,6 +37,7 @@ setup(name=name,
           "urwid_utils>=0.1.2",
           "panwid>=0.2.3"
       ],
+      test_suite="test",
       entry_points = {
           "console_scripts": [
               "mlbstreamer=mlbstreamer.__main__:main",
