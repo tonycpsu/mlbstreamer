@@ -8,7 +8,7 @@ from glob import glob
 
 name = "mlbstreamer"
 setup(name=name,
-      version="0.0.3.dev0",
+      version="0.0.3.dev1",
       description="MLB.tv Stream Browser",
       author="Tony Cebzanov",
       author_email="tonycpsu@gmail.com",
@@ -43,10 +43,6 @@ setup(name=name,
               "panwid==0.2.2.dev5",
           ],
       },
-      dependency_links=[
-          "https://github.com/tonycpsu/urwid_utils/tarball/master#egg=urwid_utils-0.0.5a",
-          "https://github.com/tonycpsu/panwid/tarball/master#egg=panwid-0.2.1",
-      ],
       entry_points = {
           "console_scripts": [
               "mlbstreamer=mlbstreamer.__main__:main",
