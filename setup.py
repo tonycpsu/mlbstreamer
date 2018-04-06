@@ -34,8 +34,8 @@ setup(name=name,
           "streamlink",
           "prompt_toolkit",
           "urwid",
-          "urwid_utils==0.1.1.dev0",
-          "panwid==0.2.2.dev5"
+          "urwid_utils>=0.1.1.dev0",
+          "panwid>=0.2.2.dev5"
       ],
       entry_points = {
           "console_scripts": [
