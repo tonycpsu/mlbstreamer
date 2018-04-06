@@ -60,7 +60,8 @@ from your favorite team is:
 
     mlbplay [TEAM]
 
-where [TEAM] is a three-letter team code, e.g. phi
+where ```[TEAM]``` is a three-letter team code, e.g. ```phi```.  If you're
+unsure of the team code, run mlbplay with a bogus team code.
 
 To stream at a different resolution, use the ```-r``` option:
 
