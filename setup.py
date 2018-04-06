@@ -18,11 +18,9 @@ setup(name=name,
           "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
           "Intended Audience :: End Users/Desktop"
       ],
+      license = "GPLv2",
       packages=find_packages(),
-      data_files=[
-          ("share/doc/%s" % name,
-           ["LICENSE","README.md"]),
-      ],
+      include_package_data=True,
       install_requires = [
           "six",
           "requests",
