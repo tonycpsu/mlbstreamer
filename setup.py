@@ -32,15 +32,11 @@ setup(name=name,
           "pyyaml",
           "py-dateutil",
           "streamlink",
-          "prompt_toolkit"
+          "prompt_toolkit",
+          "urwid",
+          "urwid_utils==0.1.1.dev0",
+          "panwid==0.2.2.dev5"
       ],
-      extras_require={
-          'gui':  [
-              "urwid",
-              "urwid_utils==0.1.1.dev0",
-              "panwid==0.2.2.dev5",
-          ],
-      },
       entry_points = {
           "console_scripts": [
               "mlbstreamer=mlbstreamer.__main__:main",
