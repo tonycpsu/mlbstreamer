@@ -117,7 +117,6 @@ def play_stream(game_specifier, resolution,
     except StopIteration:
         raise MLBPlayException("no matching media for game %d" %(game_id))
 
-    print(media)
     media_id = media["mediaId"] if "mediaId" in media else media["guid"]
     media_state = media["mediaState"]
 
