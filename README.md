@@ -1,6 +1,9 @@
 mlbstreamer
 ===========
 
+[![Build Status](https://travis-ci.org/tonycpsu/mlbstreamer.svg?branch=master)](https://travis-ci.org/tonycpsu/mlbstreamer)
+
+
 ```mlbstreamer``` enables real-time and time-shifted viewing of MLB.tv streams.
 
 The ```mlbstreamer``` package consists of the following programs:
