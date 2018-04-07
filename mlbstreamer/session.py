@@ -426,7 +426,8 @@ class MLBSession(object):
             team_id = team_id if team_id else "",
             game_id = game_id if game_id else ""
         )
-        return self.get(url).json()
+        with self.cache_responses_short():
+            return self.get(url).json()
 
     @memo(region="short")
     def get_media(self, game_id,
