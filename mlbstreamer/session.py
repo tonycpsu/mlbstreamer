@@ -442,10 +442,17 @@ class MLBSession(object):
         except KeyError:
             logger.debug("no game data")
             return
-        for epg in game["content"]["media"]["epg"]:
+        epgs = game["content"]["media"]["epg"]
+
+        if not isinstance(epgs, list):
+            epgs = [epgs]
+
+        for epg in epgs:
             if title in [None, epg["title"]]:
                 for item in epg["items"]:
-                    if preferred_stream in [None, item["mediaFeedType"]]:
+                    if "mediaFeedType" in item and preferred_stream in [
+                            None, item["mediaFeedType"]
+                    ]:
                         logger.debug("found preferred stream")
                         yield item
                 else:

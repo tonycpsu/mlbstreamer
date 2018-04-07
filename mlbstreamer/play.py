@@ -34,6 +34,9 @@ def play_stream(game_specifier, resolution,
     offset = None
     team = None
     game_number = 1
+    sport_code = "mlb" # default sport is MLB
+
+    media_title = "MLBTV"
 
     if isinstance(game_specifier, int):
         game_id = game_specifier
@@ -47,18 +50,34 @@ def play_stream(game_specifier, resolution,
         except ValueError:
             (game_date, team) = game_specifier
 
+        if "/" in team:
+            (sport_code, team) = team.split("/")
+
+
+        if sport_code != "mlb":
+            media_title = "MiLBTV"
+            raise MLBPlayException("Sorry, MiLB.tv streams are not yet supported")
+
+        sports_url = (
+            "http://statsapi.mlb.com/api/v1/sports"
+        )
+        with state.session.cache_responses_long():
+            sports = state.session.get(sports_url).json()
+
+        sport = next(s for s in sports["sports"] if s["code"] == sport_code)
+
         season = game_date.year
         teams_url = (
             "http://statsapi.mlb.com/api/v1/teams"
             "?sportId={sport}&season={season}".format(
-                sport=1,
+                sport=sport["id"],
                 season=season
             )
         )
 
         with state.session.cache_responses_long():
             teams = AttrDict(
-                (team["fileCode"], team["id"])
+                (team["abbreviation"].lower(), team["id"])
                 for team in sorted(state.session.get(teams_url).json()["teams"],
                                    key=lambda t: t["fileCode"])
             )
@@ -72,7 +91,7 @@ def play_stream(game_specifier, resolution,
         schedule = state.session.schedule(
             start = game_date,
             end = game_date,
-            sport_id = 1,
+            sport_id = sport["id"],
             team_id = teams[team]
         )
 
@@ -93,19 +112,25 @@ def play_stream(game_specifier, resolution,
 
     try:
         media = next(state.session.get_media(game_id,
+                                             title=media_title,
                                              preferred_stream=preferred_stream))
     except StopIteration:
         raise MLBPlayException("no matching media for game %d" %(game_id))
 
-    media_id = media["mediaId"]
+    print(media)
+    media_id = media["mediaId"] if "mediaId" in media else media["guid"]
     media_state = media["mediaState"]
 
-    stream = state.session.get_stream(media_id)
+    if "playbacks" in media:
+        playback = media["playbacks"][0]
+        media_url = playback["location"]
+    else:
+        stream = state.session.get_stream(media_id)
 
-    try:
-        media_url = stream["stream"]["complete"]
-    except TypeError:
-        raise MLBPlayException("no stream URL for game %d" %(game_id))
+        try:
+            media_url = stream["stream"]["complete"]
+        except TypeError:
+            raise MLBPlayException("no stream URL for game %d" %(game_id))
 
 
     if (offset_from_beginning is not None):
