@@ -212,7 +212,6 @@ class MLBSession(object):
 
     def cache_setup(self, dbfile):
         conn = sqlite3.connect(dbfile)
-        print(dbfile)
         c = conn.cursor()
         c.execute('''
         CREATE TABLE response_cache
