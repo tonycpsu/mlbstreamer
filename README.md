@@ -13,6 +13,10 @@ you to browse the MLB schedule and open game streams
 
 * ```mlbplay``` - a simple command-line program for watching a single MLB game
 
+A free MLB.com account is required in order to stream any content using these
+programs.  With a free account, you will be able to watch the free game of the
+day.  To watch subscriber-only MLB.tv streams, you will have to be a paid MLB.tv
+subscriber.
 
 Installation
 ------------
@@ -84,10 +88,6 @@ For a list of additional options, run
 
 Caveats
 -------
-
-* MLB.tv offers some free streams, but right now, this program only supports
-  MLB.tv subscribers.  Support for playing free streams without an MLB.tv account
-  should be forthcoming.
 
 * Right now, only major league games are supported, though support for MiLB
   (minor league) games is planned.
