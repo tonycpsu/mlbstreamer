@@ -5,6 +5,10 @@ import re
 import base64
 import binascii
 import json
+import sqlite3
+import pickle
+import functools
+from contextlib import contextmanager
 
 import six
 from six.moves.http_cookiejar import LWPCookieJar
@@ -20,12 +24,6 @@ from orderedattrdict.yamlutils import AttrDictYAMLLoader
 import pytz
 from datetime import datetime, timedelta
 import dateutil.parser
-
-from contextlib import contextmanager
-
-import sqlite3
-import functools
-import pickle
 
 from . import config
 from . import state
@@ -205,6 +203,9 @@ class MLBSession(object):
 
     def cache_responses_short(self):
         return self.cache_responses(CACHE_DURATION_SHORT)
+
+    def cache_responses_medium(self):
+        return self.cache_responses(CACHE_DURATION_MEDIUM)
 
     def cache_responses_long(self):
         return self.cache_responses(CACHE_DURATION_LONG)
