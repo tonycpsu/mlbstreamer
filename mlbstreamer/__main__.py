@@ -331,7 +331,9 @@ class ScheduleView(urwid.WidgetWrap):
             state.proc = play.play_stream(
                 game_id,
                 self.toolbar.resolution,
-                self.toolbar.start_from_beginning,
+                offset_from_beginning = (0
+                                         if self.toolbar.start_from_beginning
+                                         else None),
             )
         except play.MLBPlayException as e:
             logger.error(e)
