@@ -256,6 +256,7 @@ class Toolbar(urwid.WidgetWrap):
                 ("288p", "288p"),
                 ("224p", "224p")
             ]), label="resolution",
+            default=options.resolution)
 
         self.columns = urwid.Columns([
             ('weight', 1, self.league_dropdown),
@@ -346,6 +347,8 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-r", "--resolution", help="stream resolution",
+                        default="720p")
     options, args = parser.parse_known_args()
 
     log_file = os.path.join(config.CONFIG_DIR, "mlbstreamer.log")
