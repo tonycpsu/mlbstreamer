@@ -158,8 +158,8 @@ class GamesDataTable(DataTable):
     columns = [
         DataTableColumn("start", width=6, align="right"),
         # DataTableColumn("game_type", label="type", width=5, align="right"),
-        DataTableColumn("away", width=15),
-        DataTableColumn("home", width=15),
+        DataTableColumn("away", width=13),
+        DataTableColumn("home", width=13),
         DataTableColumn("line"),
         # DataTableColumn("game_id", width=6, align="right"),
     ]
@@ -242,8 +242,8 @@ class Toolbar(urwid.WidgetWrap):
             ]) , label="League: ")
 
         self.live_stream_dropdown = Dropdown([
-            "from beginning",
-            "live"
+            "live",
+            "from start"
         ], label="Live streams: ")
 
         self.resolution_dropdown = Dropdown(
@@ -255,13 +255,13 @@ class Toolbar(urwid.WidgetWrap):
                 ("360p", "360p"),
                 ("288p", "288p"),
                 ("224p", "224p")
-            ]), label="resolution")
+            ]), label="resolution",
 
         self.columns = urwid.Columns([
-            (20, self.league_dropdown),
-            (36, self.live_stream_dropdown),
-            (30, self.resolution_dropdown),
-            ("weight", 1, urwid.Padding(urwid.Text("")))
+            ('weight', 1, self.league_dropdown),
+            ('weight', 1, self.live_stream_dropdown),
+            ('weight', 1, self.resolution_dropdown),
+            # ("weight", 1, urwid.Padding(urwid.Text("")))
         ])
         self.filler = urwid.Filler(self.columns)
         super(Toolbar, self).__init__(self.filler)
@@ -276,7 +276,7 @@ class Toolbar(urwid.WidgetWrap):
 
     @property
     def start_from_beginning(self):
-        return self.live_stream_dropdown.selected_label == "from beginning"
+        return self.live_stream_dropdown.selected_label == "from start"
 
 class DateBar(urwid.WidgetWrap):
 
@@ -387,7 +387,7 @@ def main():
     # log_box = urwid.BoxAdapter(urwid.LineBox(log_console), 10)
     pile = urwid.Pile([
         ("weight", 1, urwid.LineBox(view)),
-        (10, urwid.LineBox(log_console))
+        (6, urwid.LineBox(log_console))
     ])
 
     def global_input(key):
