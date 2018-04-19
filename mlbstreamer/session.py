@@ -107,10 +107,12 @@ class MLBSession(object):
         ])
         self.no_cache = no_cache
         self._cache_responses = False
-        if not os.path.exists(CACHE_FILE): self.cache_setup(CACHE_FILE)
+        if not os.path.exists(CACHE_FILE):
+            self.cache_setup(CACHE_FILE)
         self.conn = sqlite3.connect(CACHE_FILE,
                                     detect_types = sqlite3.PARSE_DECLTYPES)
         self.cursor = self.conn.cursor()
+        self.cache_purge()
         self.login()
 
     def __getattr__(self, attr):
@@ -221,6 +223,14 @@ class MLBSession(object):
         PRIMARY KEY (url))''');
         conn.commit()
         c.close()
+
+    def cache_purge(self, days=CACHE_DURATION_LONG):
+
+        self.cursor.execute(
+            "DELETE "
+            "FROM response_cache "
+            "WHERE last_seen < datetime('now', '-%d days')" %(days)
+        )
 
     def login(self):
 
