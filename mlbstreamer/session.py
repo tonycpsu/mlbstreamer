@@ -60,6 +60,11 @@ ACCESS_TOKEN_URL = "https://edge.bamgrid.com/token"
 
 STREAM_URL_TEMPLATE="https://edge.svcs.mlb.com/media/{media_id}/scenarios/browser"
 
+AIRINGS_URL_TEMPLATE=(
+    "https://search-api-mlbtv.mlb.com/svc/search/v2/graphql/persisted/query/"
+    "core/Airings?variables={{%22partnerProgramIds%22%3A[%22{game_id}%22]}}"
+)
+
 SESSION_FILE=os.path.join(config.CONFIG_DIR, "session")
 COOKIE_FILE=os.path.join(config.CONFIG_DIR, "cookies")
 CACHE_FILE=os.path.join(config.CONFIG_DIR, "cache.sqlite")
@@ -213,6 +218,7 @@ class MLBSession(object):
         return self.cache_responses(CACHE_DURATION_LONG)
 
     def cache_setup(self, dbfile):
+
         conn = sqlite3.connect(dbfile)
         c = conn.cursor()
         c.execute('''
@@ -445,7 +451,7 @@ class MLBSession(object):
 
         logger.debug("geting media for game %d" %(game_id))
         schedule = self.schedule(game_id=game_id)
-        # raise Exception(schedule)
+
         try:
             # Get last date for games that have been rescheduled to a later date
             game = schedule["dates"][-1]["games"][0]
@@ -454,6 +460,7 @@ class MLBSession(object):
             return
         epgs = game["content"]["media"]["epg"]
 
+        # raise Exception(game["content"]["media"])
         if not isinstance(epgs, list):
             epgs = [epgs]
 
@@ -470,6 +477,66 @@ class MLBSession(object):
                         logger.debug("using non-preferred stream")
                         yield epg["items"][0]
         # raise StopIteration
+
+    def airings(self, game_id):
+
+        airings_url = AIRINGS_URL_TEMPLATE.format(game_id = game_id)
+        airings = self.get(
+            airings_url
+        ).json()["data"]["Airings"]
+        return airings
+
+
+    def media_timestamps(self, game_id, media_id):
+
+        try:
+            airing = next(a for a in self.airings(game_id)
+                          if a["mediaId"] == media_id)
+        except StopIteration:
+            raise MLBSessionException("No airing for media %s" %(media_id))
+
+        timestamps = AttrDict([
+            ("S", next(
+                t["startDatetime"] for t in
+                next(m for m in airing["milestones"]
+                     if m["milestoneType"] == "BROADCAST_START"
+            )["milestoneTime"]
+                if t["type"] == "absolute"
+            )
+            ),
+            ("SO", next(
+                t["start"] for t in
+                next(m for m in airing["milestones"]
+                     if m["milestoneType"] == "BROADCAST_START"
+            )["milestoneTime"]
+                if t["type"] == "offset"
+            )
+            ),
+
+        ])
+        timestamps.update(AttrDict([
+            (
+            "%s%s" %(
+                "T"
+                if next(
+                        k for k in m["keywords"]
+                        if k["type"] == "top"
+                )["value"] == "true"
+                else "B",
+                int(
+                    next(
+                        k for k in m["keywords"] if k["type"] == "inning"
+                    )["value"]
+                )),
+            next(t["start"]
+                      for t in m["milestoneTime"]
+                      if t["type"] == "offset"
+                 )
+            )
+                 for m in airing["milestones"]
+                 if m["milestoneType"] == "INNING_START"
+        ]))
+        return timestamps
 
     def get_stream(self, media_id):
 
@@ -488,8 +555,10 @@ class MLBSession(object):
             "x-bamsdk-platform": PLATFORM,
             "origin": "https://www.mlb.com"
         }
+        stream_url = STREAM_URL_TEMPLATE.format(media_id=media_id)
+        logger.info("getting stream %s" %(stream_url))
         stream = self.get(
-            STREAM_URL_TEMPLATE.format(media_id=media_id),
+            stream_url,
             headers=headers
         ).json()
         logger.debug("stream response: %s" %(stream))

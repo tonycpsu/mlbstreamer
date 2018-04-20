@@ -23,15 +23,13 @@ class MLBPlayException(Exception):
 class MLBPlayInvalidArgumentError(MLBPlayException):
     pass
 
-
 def play_stream(game_specifier, resolution,
-                offset_from_beginning=None,
+                offset=None,
                 preferred_stream=None,
                 output=None,
                 date_json=None):
 
     live = False
-    offset = None
     team = None
     game_number = 1
     sport_code = "mlb" # default sport is MLB
@@ -131,21 +129,31 @@ def play_stream(game_specifier, resolution,
         except TypeError:
             raise MLBPlayException("no stream URL for game %d" %(game_id))
 
+    if (offset is not None):
 
-    if (offset_from_beginning is not None):
+        timestamps = state.session.media_timestamps(game_id, media_id)
+
+        if isinstance(offset, str):
+            if not offset in timestamps:
+                raise MLBPlayException("Couldn't find inning %s" %(offset))
+            offset = timestamps[offset] - timestamps["SO"]
+            logger.debug("inning offset: %s" %(offset))
+
         if (media_state == "MEDIA_ON"): # live stream
+            logger.debug("live stream")
             # calculate HLS offset, which is negative from end of stream
             # for live streams
-            start_time = dateutil.parser.parse(game["gameDate"])
-            offset =  datetime.now(pytz.utc) - (start_time.astimezone(pytz.utc))
-            offset += timedelta(minutes=-(offset_from_beginning))
-            hours, remainder = divmod(offset.seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            offset = "%d:%02d:%02d" %(hours, minutes, seconds)
+            start_time = dateutil.parser.parse(timestamps["S"])
+            offset = str(
+                datetime.now(pytz.utc)
+                - (start_time.astimezone(pytz.utc))
+                + (timedelta(seconds=-offset))
+            )
         else:
-            td = timedelta(minutes=offset_from_beginning)
-            offset = str(td)
-            logger.info("starting at time offset %s" %(offset))
+            logger.debug("recorded stream")
+            offset = str(timedelta(seconds=offset))
+
+        logger.info("starting at time offset %s" %(offset))
 
     cmd = [
         "streamlink",
@@ -208,12 +216,42 @@ def get_output_filename(game, station, resolution):
     except KeyError:
         return "mlb.%d.%s.ts" % (game["gamePk"], resolution)
 
+
 def valid_date(s):
     try:
         return datetime.strptime(s, "%Y-%m-%d").date()
     except ValueError:
         msg = "Not a valid date: '{0}'.".format(s)
         raise argparse.ArgumentTypeError(msg)
+
+
+def begin_arg_to_offset(value):
+    if value.isdigit():
+        # Integer number of seconds
+        value = int(value)
+    else:
+        try:
+            value = (
+                datetime.strptime(value, "%H:%M:%S")
+                - datetime.min
+            ).seconds
+        except ValueError:
+            try:
+                value = (
+                    datetime.strptime(value, "%M:%S")
+                    - datetime.min
+                ).seconds
+            except:
+                if not (value == "S"
+                        or (value[0] in "TB" and value[1:].isdigit())
+                ):
+                    raise argparse.ArgumentTypeError(
+                        "Offset must be an integer number of seconds, "
+                        "a time string e.g. 1:23:45, "
+                        "or a string like T1 or B3 to select a half inning"
+                    )
+    return value
+
 
 def main():
 
@@ -227,11 +265,11 @@ def main():
                         help="number of team game on date (for doubleheaders)",
                         default=1,
                         type=int)
-    parser.add_argument("-b", "--beginning",
-                        help="play live streams from beginning",
+    parser.add_argument("-b", "--begin",
+                        help="begin playback at this offset from start",
                         nargs="?", metavar="offset_from_game_start",
-                        type=int,
-                        const=-10)
+                        type=begin_arg_to_offset,
+                        const=0)
     parser.add_argument("-r", "--resolution", help="stream resolution",
                         default="720p")
     parser.add_argument("-s", "--save-stream", help="save stream to file",
@@ -281,7 +319,7 @@ def main():
         proc = play_stream(
             game_specifier,
             options.resolution,
-            offset_from_beginning = options.beginning,
+            offset = options.begin,
             preferred_stream = preferred_stream,
             output = options.save_stream,
         )
