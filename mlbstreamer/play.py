@@ -75,7 +75,7 @@ def play_stream(game_specifier, resolution,
 
         with state.session.cache_responses_long():
             teams = AttrDict(
-                (team["abbreviation"].lower(), team["id"])
+                (team["teamCode"].lower(), team["id"])
                 for team in sorted(state.session.get(teams_url).json()["teams"],
                                    key=lambda t: t["fileCode"])
             )
