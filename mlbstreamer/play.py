@@ -103,9 +103,9 @@ def play_stream(game_specifier, resolution,
         )
 
     preferred_stream = (
-        "HOME"
-        if team == game["teams"]["home"]["team"]["fileCode"]
-        else "AWAY"
+        "AWAY"
+        if team == game["teams"]["away"]["team"]["abbreviation"].lower()
+        else "HOME"
     )
 
     try:
