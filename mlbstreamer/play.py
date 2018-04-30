@@ -27,7 +27,7 @@ def play_stream(game_specifier, resolution,
                 offset=None,
                 preferred_stream=None,
                 output=None,
-                date_json=None):
+                date_json=None, verbose=False):
 
     live = False
     team = None
@@ -164,8 +164,12 @@ def play_stream(game_specifier, resolution,
         media_url,
         resolution,
     ]
+
     if config.settings.streamlink_args:
         cmd += shlex.split(config.settings.streamlink_args)
+
+    if verbose:
+        cmd += ['-v', '-l', 'debug', '--ffmpeg-verbose']
 
     if offset:
         cmd += ["--hls-start-offset", offset]
@@ -185,7 +189,7 @@ def play_stream(game_specifier, resolution,
         cmd += ["-o", outfile]
 
     logger.debug("Running cmd: %s" % " ".join(cmd))
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    proc = subprocess.Popen(cmd)
     return proc
 
 # def get_date_json(game_id, date_json):
@@ -322,6 +326,7 @@ def main():
             offset = options.begin,
             preferred_stream = preferred_stream,
             output = options.save_stream,
+            verbose = options.verbose
         )
         proc.wait()
     except MLBPlayInvalidArgumentError as e:
