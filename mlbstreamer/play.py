@@ -129,6 +129,8 @@ def play_stream(game_specifier, resolution,
         except TypeError:
             raise MLBPlayException("no stream URL for game %d" %(game_id))
 
+    offset_timestamp = None
+    offset_seconds = None
     if (offset is not None):
 
         timestamps = state.session.media_timestamps(game_id, media_id)
@@ -144,15 +146,17 @@ def play_stream(game_specifier, resolution,
             # calculate HLS offset, which is negative from end of stream
             # for live streams
             start_time = dateutil.parser.parse(timestamps["S"])
-            offset = str(
+            offset_delta = (
                 datetime.now(pytz.utc)
-                - (start_time.astimezone(pytz.utc))
+                - start_time.astimezone(pytz.utc)
                 + (timedelta(seconds=-offset))
             )
         else:
             logger.debug("recorded stream")
-            offset = str(timedelta(seconds=offset))
+            offset_delta = timedelta(seconds=offset)
 
+        offset_seconds = offset_delta.seconds
+        offset_timestamp = str(offset_delta)
         logger.info("starting at time offset %s" %(offset))
 
     cmd = [
@@ -168,14 +172,15 @@ def play_stream(game_specifier, resolution,
         cmd += shlex.split(config.settings.streamlink_args)
 
     if offset:
-        cmd += ["--hls-start-offset", offset]
+        cmd += ["--hls-start-offset", offset_timestamp]
 
     if output is not None:
         if output == True or os.path.isdir(output):
             outfile = get_output_filename(
                 game,
                 media["callLetters"],
-                resolution
+                resolution,
+                offset=str(offset_seconds)
             )
             if os.path.isdir(output):
                 outfile = os.path.join(output, outfile)
@@ -193,7 +198,7 @@ def play_stream(game_specifier, resolution,
 #         return date_json
 #     return state.session.schedule(game_id=game_id)["dates"][-1]
 
-def get_output_filename(game, station, resolution):
+def get_output_filename(game, station, resolution, offset=None):
     try:
         # if (date is None):
         #     date = state.session.schedule(game_id=game["gamePk"])["dates"][-1]
@@ -206,6 +211,8 @@ def get_output_filename(game, station, resolution):
 
         game_date = start_time.date().strftime("%Y%m%d")
         game_time = start_time.time().strftime("%H%M")
+        if offset:
+            game_time = "%s_%s" %(game_time, offset)
         return "mlb.%s.%s@%s.%s.%s.ts" \
                % (game_date,
                   game["teams"]["away"]["team"]["fileCode"],
