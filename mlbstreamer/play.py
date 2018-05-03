@@ -171,7 +171,7 @@ def play_stream(game_specifier, resolution,
     if config.settings.streamlink_args:
         cmd += shlex.split(config.settings.streamlink_args)
 
-    if offset:
+    if offset_timestamp:
         cmd += ["--hls-start-offset", offset_timestamp]
 
     if output is not None:
