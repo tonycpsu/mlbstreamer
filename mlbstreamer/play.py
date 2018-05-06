@@ -29,7 +29,8 @@ def play_stream(game_specifier, resolution=None,
                 media_id = None,
                 preferred_stream=None,
                 call_letters=None,
-                output=None):
+                output=None,
+                verbose=0):
 
     live = False
     team = None
@@ -192,6 +193,15 @@ def play_stream(game_specifier, resolution=None,
     if offset_timestamp:
         cmd += ["--hls-start-offset", offset_timestamp]
 
+    if verbose > 1:
+
+        cmd += ["-l", "debug"]
+
+        if verbose > 2:
+            if not output:
+                cmd += ["-v"]
+            cmd += ["--ffmpeg-verbose"]
+
     if output is not None:
         if output == True or os.path.isdir(output):
             outfile = get_output_filename(
@@ -208,7 +218,7 @@ def play_stream(game_specifier, resolution=None,
         cmd += ["-o", outfile]
 
     logger.debug("Running cmd: %s" % " ".join(cmd))
-    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
+    proc = subprocess.Popen(cmd)
     return proc
 
 
@@ -298,7 +308,7 @@ def main():
                         nargs="?", const=True)
     parser.add_argument("--no-cache", help="do not use response cache",
                         action="store_true")
-    parser.add_argument("-v", "--verbose", action="store_true",
+    parser.add_argument("-v", "--verbose", action="count",
                         help="verbose logging")
     parser.add_argument("game", metavar="game",
                         nargs="?",
@@ -337,6 +347,7 @@ def main():
             offset = options.begin,
             preferred_stream = preferred_stream,
             output = options.save_stream,
+            verbose = options.verbose
         )
         proc.wait()
     except MLBPlayInvalidArgumentError as e:
