@@ -445,9 +445,17 @@ class ScheduleView(BaseView):
             self.datebar.set_date(self.game_date)
             self.table.set_game_date(self.game_date)
         elif key == "w": # watch home stream
-            self.watch(self.table.selection.data.game_id, preferred_stream="home")
+            self.watch(
+                self.table.selection.data.game_id,
+                preferred_stream="home",
+                resolution=self.toolbar.resolution
+            )
         elif key == "W": # watch away stream
-            self.watch(self.table.selection.data.game_id, preferred_stream="away")
+            self.watch(
+                self.table.selection.data.game_id,
+                preferred_stream="away",
+                resolution=self.toolbar.resolution
+            )
         else:
             return key
 
