@@ -29,6 +29,7 @@ from .state import memo
 from . import config
 from . import play
 from . import widgets
+from .util import *
 from .session import *
 
 
@@ -411,10 +412,9 @@ class WatchDialog(BasePopUp):
 
 class ScheduleView(BaseView):
 
-    def __init__(self):
+    def __init__(self, date):
 
-        today = datetime.now().date()
-        self.game_date = today
+        self.game_date = date
         self.toolbar = Toolbar()
         self.datebar = DateBar(self.game_date)
         self.table = GamesDataTable(self.toolbar.sport_id, self.game_date) # preseason
@@ -480,10 +480,15 @@ def main():
     global options
     global logger
 
+    today = datetime.now(pytz.timezone('US/Eastern')).date()
+
     parser = argparse.ArgumentParser()
-    parser.add_argument("-v", "--verbose", action="store_true")
+    parser.add_argument("-d", "--date", help="game date",
+                        type=valid_date,
+                        default=today)
     parser.add_argument("-r", "--resolution", help="stream resolution",
                         default="720p_alt")
+    parser.add_argument("-v", "--verbose", action="store_true")
     options, args = parser.parse_known_args()
 
     log_file = os.path.join(config.CONFIG_DIR, "mlbstreamer.log")
@@ -519,7 +524,7 @@ def main():
     screen = urwid.raw_display.Screen()
     screen.set_terminal_properties(256)
 
-    view = ScheduleView()
+    view = ScheduleView(options.date)
 
     log_console = widgets.ConsoleWindow()
     # log_box = urwid.BoxAdapter(urwid.LineBox(log_console), 10)

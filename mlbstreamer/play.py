@@ -15,6 +15,7 @@ from orderedattrdict import AttrDict
 
 from . import config
 from . import state
+from .util import *
 from .session import *
 
 class MLBPlayException(Exception):
@@ -234,14 +235,6 @@ def get_output_filename(game, station, resolution, offset=None):
                   )
     except KeyError:
         return "mlb.%d.%s.ts" % (game["gamePk"], resolution)
-
-
-def valid_date(s):
-    try:
-        return datetime.strptime(s, "%Y-%m-%d").date()
-    except ValueError:
-        msg = "Not a valid date: '{0}'.".format(s)
-        raise argparse.ArgumentTypeError(msg)
 
 
 def begin_arg_to_offset(value):
