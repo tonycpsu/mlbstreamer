@@ -23,11 +23,12 @@ class MLBPlayException(Exception):
 class MLBPlayInvalidArgumentError(MLBPlayException):
     pass
 
-def play_stream(game_specifier, resolution,
+def play_stream(game_specifier, resolution=None,
                 offset=None,
+                media_id = None,
                 preferred_stream=None,
-                output=None,
-                date_json=None):
+                call_letters=None,
+                output=None):
 
     live = False
     team = None
@@ -35,6 +36,10 @@ def play_stream(game_specifier, resolution,
     sport_code = "mlb" # default sport is MLB
 
     media_title = "MLBTV"
+    media_id = None
+
+    if resolution is None:
+        resolution = "best"
 
     if isinstance(game_specifier, int):
         game_id = game_specifier
@@ -93,6 +98,7 @@ def play_stream(game_specifier, resolution,
             team_id = teams[team]
         )
 
+
     try:
         date = schedule["dates"][-1]
         game = date["games"][game_number-1]
@@ -102,20 +108,30 @@ def play_stream(game_specifier, resolution,
             game_number, team, game_date)
         )
 
-    preferred_stream = (
-        "AWAY"
-        if team == game["teams"]["away"]["team"]["abbreviation"].lower()
-        else "HOME"
+    logger.info("playing game %d at %s" %(
+        game_id, resolution)
     )
 
+    if not preferred_stream or call_letters:
+        preferred_stream = (
+            "away"
+            if team == game["teams"]["away"]["team"]["abbreviation"].lower()
+            else "home"
+        )
+
     try:
-        media = next(state.session.get_media(game_id,
-                                             title=media_title,
-                                             preferred_stream=preferred_stream))
+        media = next(state.session.get_media(
+            game_id,
+            media_id = media_id,
+            title=media_title,
+            preferred_stream=preferred_stream,
+            call_letters = call_letters
+        ))
     except StopIteration:
         raise MLBPlayException("no matching media for game %d" %(game_id))
 
     media_id = media["mediaId"] if "mediaId" in media else media["guid"]
+
     media_state = media["mediaState"]
 
     if "playbacks" in media:
@@ -131,7 +147,7 @@ def play_stream(game_specifier, resolution,
 
     offset_timestamp = None
     offset_seconds = None
-    if (offset is not None):
+    if (offset not in [None, False]):
 
         timestamps = state.session.media_timestamps(game_id, media_id)
 
@@ -193,10 +209,6 @@ def play_stream(game_specifier, resolution,
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     return proc
 
-# def get_date_json(game_id, date_json):
-#     if date_json is not None:
-#         return date_json
-#     return state.session.schedule(game_id=game_id)["dates"][-1]
 
 def get_output_filename(game, station, resolution, offset=None):
     try:

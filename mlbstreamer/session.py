@@ -506,25 +506,44 @@ class MLBSession(object):
         except StopIteration:
             raise MLBSessionException("No airing for media %s" %(media_id))
 
-        timestamps = AttrDict([
-            ("S", next(
-                t["startDatetime"] for t in
-                next(m for m in airing["milestones"]
+        start_timestamps = []
+        try:
+            start_time = next(
+                    t["startDatetime"] for t in
+                    next(m for m in airing["milestones"]
                      if m["milestoneType"] == "BROADCAST_START"
-            )["milestoneTime"]
+                    )["milestoneTime"]
                 if t["type"] == "absolute"
-            )
-            ),
-            ("SO", next(
+                )
+
+        except StopIteration:
+            # Some streams don't have a "BROADCAST_START" milestone.  We need
+            # something, so we use the scheduled game start time, which is
+            # probably wrong.
+            start_time = airing["startDate"]
+
+        start_timestamps.append(
+            ("S", start_time)
+        )
+
+        try:
+            start_offset = next(
                 t["start"] for t in
                 next(m for m in airing["milestones"]
                      if m["milestoneType"] == "BROADCAST_START"
-            )["milestoneTime"]
+                )["milestoneTime"]
                 if t["type"] == "offset"
             )
-            ),
+        except StopIteration:
+            # Same as above.  Missing BROADCAST_START milestone means we
+            # probably don't get accurate offsets for inning milestones.
+            start_offset = 0
 
-        ])
+        start_timestamps.append(
+            ("SO", start_offset)
+        )
+
+        timestamps = AttrDict(start_timestamps)
         timestamps.update(AttrDict([
             (
             "%s%s" %(
