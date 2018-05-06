@@ -35,7 +35,7 @@ setup(name=name,
           "prompt_toolkit",
           "urwid",
           "urwid_utils>=0.1.2",
-          "panwid>=0.2.4"
+          "panwid>=0.2.5"
       ],
       test_suite="test",
       entry_points = {
