@@ -395,6 +395,10 @@ class WatchDialog(BasePopUp):
 
         if key == "meta enter":
             self.ok_button.keypress(size, "enter")
+        elif key in ["-", "="]:
+            self.resolution_dropdown.cycle(1 if key == "-" else -1)
+        elif key in ["[", "]"]:
+            self.feed_dropdown.cycle(-1 if key == "[" else 1)
         else:
             # return super(WatchDialog, self).keypress(size, key)
             key = super(WatchDialog, self).keypress(size, key)
