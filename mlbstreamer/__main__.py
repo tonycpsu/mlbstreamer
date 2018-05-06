@@ -440,6 +440,8 @@ class ScheduleView(BaseView):
             self.game_date += timedelta(days= -1 if key == "left" else 1)
             self.datebar.set_date(self.game_date)
             self.table.set_game_date(self.game_date)
+        elif key in ["-", "="]:
+            self.toolbar.resolution_dropdown.cycle(1 if key == "-" else -1)
         elif key == "t":
             self.game_date = datetime.now().date()
             self.datebar.set_date(self.game_date)
