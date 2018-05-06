@@ -148,7 +148,8 @@ def play_stream(game_specifier, resolution=None,
 
     offset_timestamp = None
     offset_seconds = None
-    if (offset not in [None, False]):
+
+    if (offset is not False and offset is not None):
 
         timestamps = state.session.media_timestamps(game_id, media_id)
 
