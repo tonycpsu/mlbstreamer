@@ -270,6 +270,15 @@ def main():
 
     today = datetime.now(pytz.timezone('US/Eastern')).date()
 
+    init_parser = argparse.ArgumentParser()
+    init_parser.add_argument("--init-config", help="initialize configuration",
+                        action="store_true")
+    options, args = init_parser.parse_known_args()
+    if options.init_config:
+        config.settings.init_config()
+        sys.exit(0)
+    config.settings.load()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--date", help="game date",
                         type=valid_date,
@@ -284,15 +293,13 @@ def main():
                         type=begin_arg_to_offset,
                         const=0)
     parser.add_argument("-r", "--resolution", help="stream resolution",
-                        default="720p")
+                        default=config.settings.default_resolution)
     parser.add_argument("-s", "--save-stream", help="save stream to file",
                         nargs="?", const=True)
     parser.add_argument("--no-cache", help="do not use response cache",
                         action="store_true")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="verbose logging")
-    parser.add_argument("--init-config", help="initialize configuration",
-                        action="store_true")
     parser.add_argument("game", metavar="game",
                         nargs="?",
                         help="team abbreviation or MLB game ID")
@@ -309,11 +316,6 @@ def main():
         logger.addHandler(handler)
     else:
         logger.addHandler(logging.NullHandler())
-
-    if options.init_config:
-        config.settings.init_config()
-        sys.exit(0)
-    config.settings.load()
 
     if not options.game:
         parser.error("option game")

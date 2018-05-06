@@ -18,6 +18,7 @@ from prompt_toolkit.validation import Validator, ValidationError
 from prompt_toolkit.shortcuts import confirm
 from prompt_toolkit.shortcuts import prompt
 import getpass
+from .util import *
 
 CONFIG_DIR=os.path.expanduser("~/.config/mlbstreamer")
 CONFIG_FILE=os.path.join(CONFIG_DIR, "config.yaml")
@@ -150,6 +151,21 @@ class Config(MutableMapping):
             player = " ".join([player, player_args])
 
         self.player = player
+
+        print()
+        print("\n".join(
+            [ "\t%d: %s" %(n, l)
+              for n, l in enumerate(
+                      MLB_HLS_RESOLUTION_MAP
+              )]))
+        choice = int(
+            prompt(
+                "Select a default video resolution for MLB.tv streams",
+                validator=RangeNumberValidator(maximum=len(MLB_HLS_RESOLUTION_MAP))))
+        if choice:
+            self.default_resolution = MLB_HLS_RESOLUTION_MAP[
+                list(MLB_HLS_RESOLUTION_MAP.keys())[choice]
+            ]
 
         print("Your system time zone seems to be %s." %(tz_local))
         if not confirm("Is that the time zone you'd like to use? (y/n) "):

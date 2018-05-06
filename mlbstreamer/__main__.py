@@ -233,15 +233,7 @@ class GamesDataTable(DataTable):
 
 class ResolutionDropdown(Dropdown):
 
-    items = [
-        ("720p", "720p_alt"),
-        ("720p@30", "720p"),
-        ("540p", "540p"),
-        ("504p", "504p"),
-        ("360p", "360p"),
-        ("288p", "288p"),
-        ("224p", "224p")
-    ]
+    items = MLB_HLS_RESOLUTION_MAP
 
     label = "Resolution"
 
@@ -483,12 +475,14 @@ def main():
 
     today = datetime.now(pytz.timezone('US/Eastern')).date()
 
+    config.settings.load()
+
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--date", help="game date",
                         type=valid_date,
                         default=today)
     parser.add_argument("-r", "--resolution", help="stream resolution",
-                        default="720p_alt")
+                        default=config.settings.default_resolution)
     parser.add_argument("-v", "--verbose", action="store_true")
     options, args = parser.parse_known_args()
 
@@ -513,7 +507,6 @@ def main():
     logger.addHandler(ulh)
 
     logger.debug("mlbstreamer starting")
-    config.settings.load()
 
     state.session = MLBSession.new()
 
