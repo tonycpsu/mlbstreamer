@@ -39,6 +39,7 @@ def play_stream(game_specifier, resolution=None,
 
     media_title = "MLBTV"
     media_id = None
+    allow_stdout=False
 
     if resolution is None:
         resolution = "best"
@@ -195,6 +196,7 @@ def play_stream(game_specifier, resolution=None,
 
     if verbose > 1:
 
+        allow_stdout=True
         cmd += ["-l", "debug"]
 
         if verbose > 2:
@@ -218,7 +220,7 @@ def play_stream(game_specifier, resolution=None,
         cmd += ["-o", outfile]
 
     logger.debug("Running cmd: %s" % " ".join(cmd))
-    proc = subprocess.Popen(cmd)
+    proc = subprocess.Popen(cmd, stdout=None if allow_stdout else open(os.devnull, 'w'))
     return proc
 
 
