@@ -316,10 +316,11 @@ class WatchDialog(BasePopUp):
             self.game_data["teams"]["home"]["team"]["abbreviation"],
         ))
 
-        feed_map = [
-            (e["callLetters"], e["mediaId"].lower())
+        feed_map = sorted([
+            ("%s (%s)" %(e["mediaFeedType"].title(),
+                         e["callLetters"]), e["mediaId"].lower())
             for e in state.session.get_media(self.game_id)
-        ]
+        ], key=lambda v: v[0])
         home_feed = next(state.session.get_media(
             self.game_id,
             preferred_stream = "home"
