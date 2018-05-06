@@ -8,7 +8,7 @@ from glob import glob
 
 name = "mlbstreamer"
 setup(name=name,
-      version="0.0.9",
+      version="0.0.10.dev0",
       description="MLB.tv Stream Browser",
       author="Tony Cebzanov",
       author_email="tonycpsu@gmail.com",
