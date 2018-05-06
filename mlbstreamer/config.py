@@ -103,7 +103,7 @@ class Config(MutableMapping):
 
         while True:
             self.username = prompt(
-                "MLB.tv username: ",
+                "MLB.com username: ",
                 validator=NotEmptyValidator())
             self.password =  prompt(
                 'Enter password: ',
