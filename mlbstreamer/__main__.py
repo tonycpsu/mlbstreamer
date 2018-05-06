@@ -233,8 +233,8 @@ class GamesDataTable(DataTable):
 class ResolutionDropdown(Dropdown):
 
     items = [
-        ("720p (60fps)", "720p_alt"),
-        ("720p", "720p"),
+        ("720p", "720p_alt"),
+        ("720p@30", "720p"),
         ("540p", "540p"),
         ("504p", "504p"),
         ("360p", "360p"),
@@ -483,7 +483,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("-r", "--resolution", help="stream resolution",
-                        default="720p")
+                        default="720p_alt")
     options, args = parser.parse_known_args()
 
     log_file = os.path.join(config.CONFIG_DIR, "mlbstreamer.log")
