@@ -445,13 +445,8 @@ class MLBSession(object):
             return self.get(url).json()
 
     @memo(region="short")
-    def get_media(self, game_id,
-                  title="MLBTV",
-                  preferred_stream=None):
-
-        logger.debug("geting media for game %d" %(game_id))
+    def get_epgs(self, game_id, title="MLBTV"):
         schedule = self.schedule(game_id=game_id)
-
         try:
             # Get last date for games that have been rescheduled to a later date
             game = schedule["dates"][-1]["games"][0]
@@ -460,22 +455,38 @@ class MLBSession(object):
             return
         epgs = game["content"]["media"]["epg"]
 
-        # raise Exception(game["content"]["media"])
         if not isinstance(epgs, list):
             epgs = [epgs]
 
+        return [ e for e in epgs if (not title) or title == e["title"] ]
+
+    def get_media(self,
+                  game_id,
+                  media_id=None,
+                  title="MLBTV",
+                  preferred_stream=None,
+                  call_letters=None):
+
+        logger.debug("geting media for game %d" %(game_id))
+
+        epgs = self.get_epgs(game_id, title)
         for epg in epgs:
-            if title in [None, epg["title"]]:
-                for item in epg["items"]:
-                    if "mediaFeedType" in item and preferred_stream in [
-                            None, item["mediaFeedType"]
-                    ]:
-                        logger.debug("found preferred stream")
-                        yield item
-                else:
-                    if len(epg["items"]):
-                        logger.debug("using non-preferred stream")
-                        yield epg["items"][0]
+            for item in epg["items"]:
+                if (not preferred_stream
+                    or (item.get("mediaFeedType", "").lower() == preferred_stream)
+                ) and (
+                    not call_letters
+                    or (item.get("callLetters", "").lower() == call_letters)
+                ) and (
+                    not media_id
+                    or (item.get("mediaId", "").lower() == media_id)
+                ):
+                    logger.debug("found preferred stream")
+                    yield item
+            else:
+                if len(epg["items"]):
+                    logger.debug("using non-preferred stream")
+                    yield epg["items"][0]
         # raise StopIteration
 
     def airings(self, game_id):
