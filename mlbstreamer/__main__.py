@@ -317,12 +317,12 @@ class WatchDialog(BasePopUp):
             self.game_id,
             preferred_stream = "home"
         ))
+        self.live_stream = (home_feed.get("mediaState") == "MEDIA_ON")
         self.feed_dropdown = Dropdown(
             feed_map,
             label="Feed",
             default=home_feed["mediaId"]
         )
-
         urwid.connect_signal(
             self.feed_dropdown,
             "change",
@@ -375,7 +375,11 @@ class WatchDialog(BasePopUp):
         timestamp_map["Live"] = False
         self.inning_dropdown = Dropdown(
             timestamp_map, label="Begin playback",
-            default = timestamp_map["Start"] if self.from_beginning else timestamp_map["Live"]
+            default = (
+                timestamp_map["Start"] if (
+                    not self.live_stream or self.from_beginning
+                ) else timestamp_map["Live"]
+            )
         )
         self.inning_dropdown_placeholder.original_widget = self.inning_dropdown
 
