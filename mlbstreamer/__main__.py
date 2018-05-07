@@ -399,10 +399,12 @@ class WatchDialog(BasePopUp):
 
         if key == "meta enter":
             self.ok_button.keypress(size, "enter")
-        elif key in ["-", "="]:
-            self.resolution_dropdown.cycle(1 if key == "-" else -1)
+        elif key in ["<", ">"]:
+            self.resolution_dropdown.cycle(1 if key == "<" else -1)
         elif key in ["[", "]"]:
             self.feed_dropdown.cycle(-1 if key == "[" else 1)
+        elif key in ["-", "="]:
+            self.inning_dropdown.cycle(-1 if key == "-" else 1)
         else:
             # return super(WatchDialog, self).keypress(size, key)
             key = super(WatchDialog, self).keypress(size, key)
@@ -448,8 +450,10 @@ class ScheduleView(BaseView):
             self.game_date += timedelta(days= -1 if key == "left" else 1)
             self.datebar.set_date(self.game_date)
             self.table.set_game_date(self.game_date)
+        elif key in ["<", ">"]:
+            self.toolbar.resolution_dropdown.cycle(1 if key == "<" else -1)
         elif key in ["-", "="]:
-            self.toolbar.resolution_dropdown.cycle(1 if key == "-" else -1)
+            self.toolbar.live_stream_dropdown.cycle(1 if key == "-" else -1)
         elif key == "t":
             self.game_date = datetime.now().date()
             self.datebar.set_date(self.game_date)
