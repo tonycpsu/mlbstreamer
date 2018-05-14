@@ -182,14 +182,14 @@ def play_stream(game_specifier, resolution=None,
     cmd = [
         "streamlink",
         # "-l", "debug",
-        "--player", config.settings.player,
+        "--player", config.settings.profile.player,
         "--http-header",
         "Authorization=%s" %(state.session.access_token),
         media_url,
         resolution,
     ]
-    if config.settings.streamlink_args:
-        cmd += shlex.split(config.settings.streamlink_args)
+    if config.settings.profile.streamlink_args:
+        cmd += shlex.split(config.settings.profile.streamlink_args)
 
     if offset_timestamp:
         cmd += ["--hls-start-offset", offset_timestamp]
@@ -285,11 +285,17 @@ def main():
     init_parser = argparse.ArgumentParser()
     init_parser.add_argument("--init-config", help="initialize configuration",
                         action="store_true")
+    init_parser.add_argument("-p", "--profile", help="use alternate config profile")
     options, args = init_parser.parse_known_args()
+
     if options.init_config:
         config.settings.init_config()
         sys.exit(0)
+
     config.settings.load()
+
+    if options.profile:
+        config.settings.set_profile(options.profile)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--date", help="game date",
@@ -305,7 +311,7 @@ def main():
                         type=begin_arg_to_offset,
                         const=0)
     parser.add_argument("-r", "--resolution", help="stream resolution",
-                        default=config.settings.default_resolution)
+                        default=config.settings.profile.default_resolution)
     parser.add_argument("-s", "--save-stream", help="save stream to file",
                         nargs="?", const=True)
     parser.add_argument("--no-cache", help="do not use response cache",

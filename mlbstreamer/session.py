@@ -179,8 +179,8 @@ class MLBSession(object):
         try:
             return cls.load()
         except:
-            return cls(username=config.settings.username,
-                       password=config.settings.password,
+            return cls(username=config.settings.profile.username,
+                       password=config.settings.profile.password,
                        **kwargs)
 
     @classmethod

@@ -199,11 +199,13 @@ class GamesDataTable(DataTable):
                 away_abbrev = g["teams"]["away"]["team"]["abbreviation"]
                 home_abbrev = g["teams"]["home"]["team"]["abbreviation"]
                 start_time = dateutil.parser.parse(g["gameDate"])
-                if config.settings.time_zone:
-                    start_time = start_time.astimezone(config.settings.tz)
+                if config.settings.profile.time_zone:
+                    start_time = start_time.astimezone(
+                        pytz.timezone(config.settings.profile.time_zone)
+                    )
 
                 hide_spoilers = set([away_abbrev, home_abbrev]).intersection(
-                    set(config.settings.get("hide_spoiler_teams", [])))
+                    set(config.settings.profile.get("hide_spoiler_teams", [])))
 
                 if "linescore" in g and len(g["linescore"]["innings"]):
                     self.line_score_table = LineScoreDataTable.from_mlb_api(
@@ -497,14 +499,21 @@ def main():
 
     today = datetime.now(pytz.timezone('US/Eastern')).date()
 
+    init_parser = argparse.ArgumentParser()
+    init_parser.add_argument("-p", "--profile", help="use alternate config profile")
+    options, args = init_parser.parse_known_args()
+
     config.settings.load()
+
+    if options.profile:
+        config.settings.set_profile(options.profile)
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--date", help="game date",
                         type=valid_date,
                         default=today)
     parser.add_argument("-r", "--resolution", help="stream resolution",
-                        default=config.settings.default_resolution)
+                        default=config.settings.profile.default_resolution)
     parser.add_argument("-v", "--verbose", action="store_true")
     options, args = parser.parse_known_args()
 
