@@ -464,13 +464,15 @@ class ScheduleView(BaseView):
             self.watch(
                 self.table.selection.data.game_id,
                 preferred_stream="home",
-                resolution=self.toolbar.resolution
+                resolution=self.toolbar.resolution,
+                offset = 0 if self.toolbar.start_from_beginning else None
             )
         elif key == "W": # watch away stream
             self.watch(
                 self.table.selection.data.game_id,
                 preferred_stream="away",
-                resolution=self.toolbar.resolution
+                resolution=self.toolbar.resolution,
+                offset = 0 if self.toolbar.start_from_beginning else None
             )
         else:
             return key
