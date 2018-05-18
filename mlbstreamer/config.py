@@ -97,6 +97,11 @@ class ProfileTree(Tree):
         else:
             object.__setattr__(self, name, value)
 
+    def get(self, name, default=None):
+        p = self.profile
+        return p.get(name, default) if name in p else self[self._default_profile_name].get(name, default)
+
+
 class Config(Tree):
 
     DEFAULT_PROFILE = "default"
