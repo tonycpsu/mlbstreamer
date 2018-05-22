@@ -316,7 +316,7 @@ def main():
                         nargs="?", const=True)
     parser.add_argument("--no-cache", help="do not use response cache",
                         action="store_true")
-    parser.add_argument("-v", "--verbose", action="count",
+    parser.add_argument("-v", "--verbose", action="count", default=0,
                         help="verbose logging")
     parser.add_argument("game", metavar="game",
                         nargs="?",
