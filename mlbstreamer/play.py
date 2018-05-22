@@ -282,7 +282,7 @@ def main():
 
     today = datetime.now(pytz.timezone('US/Eastern')).date()
 
-    init_parser = argparse.ArgumentParser()
+    init_parser = argparse.ArgumentParser(add_help=False)
     init_parser.add_argument("--init-config", help="initialize configuration",
                         action="store_true")
     init_parser.add_argument("-p", "--profile", help="use alternate config profile")
@@ -297,7 +297,10 @@ def main():
     if options.profile:
         config.settings.set_profile(options.profile)
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description=init_parser.format_help(),
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("-d", "--date", help="game date",
                         type=valid_date,
                         default=today)
