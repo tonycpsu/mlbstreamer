@@ -115,10 +115,13 @@ def play_stream(game_specifier, resolution=None,
         game_id, resolution)
     )
 
+    away_team_abbrev = game["teams"]["away"]["team"]["abbreviation"].lower()
+    home_team_abbrev = game["teams"]["home"]["team"]["abbreviation"].lower()
+
     if not preferred_stream or call_letters:
         preferred_stream = (
             "away"
-            if team == game["teams"]["away"]["team"]["abbreviation"].lower()
+            if team == away_team_abbrev
             else "home"
         )
 
@@ -222,8 +225,16 @@ def play_stream(game_specifier, resolution=None,
     env = os.environ.copy()
     env.update(config.settings.profile.get("env", {}))
 
+    try:
+        profiles = tuple([ list(d.values())[0]
+                     for d in config.settings.profile_map.get("team", {})
+                     if list(d.keys())[0] in [
+                             away_team_abbrev, home_team_abbrev
+                     ] ])
+        env.update(config.settings.profiles[profiles].env)
+    except StopIteration:
+        pass
     logger.debug("Running cmd: %s" % " ".join(cmd))
-    proc = subprocess.Popen(cmd, stdout=None if allow_stdout else open(os.devnull, 'w'))
     proc = subprocess.Popen(
         cmd,
         env=env,
