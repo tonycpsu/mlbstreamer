@@ -219,8 +219,15 @@ def play_stream(game_specifier, resolution=None,
 
         cmd += ["-o", outfile]
 
+    env = os.environ.copy()
+    env.update(config.settings.profile.get("env", {}))
+
     logger.debug("Running cmd: %s" % " ".join(cmd))
     proc = subprocess.Popen(cmd, stdout=None if allow_stdout else open(os.devnull, 'w'))
+    proc = subprocess.Popen(
+        cmd,
+        env=env,
+        stdout=None if allow_stdout else open(os.devnull, 'w'))
     return proc
 
 
