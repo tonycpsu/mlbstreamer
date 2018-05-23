@@ -7,6 +7,7 @@ try:
 except ImportError:
     from collections import MutableMapping
 import yaml
+import functools
 from orderedattrdict import Tree
 import orderedattrdict.yamlutils
 from orderedattrdict.yamlutils import AttrDictYAMLLoader
@@ -101,6 +102,15 @@ class ProfileTree(Tree):
         p = self.profile
         return p.get(name, default) if name in p else self[self._default_profile_name].get(name, default)
 
+    def __getitem__(self, name):
+        if isinstance(name, tuple):
+            return functools.reduce(
+                lambda a, b: AttrDict(a, **{ k: v for k, v in b.items() if k not in a}),
+                [ self[p] for p in reversed(name) ]
+            )
+
+        else:
+            return super(ProfileTree, self).__getitem__(name)
 
 class Config(Tree):
 
@@ -253,3 +263,18 @@ __all__ = [
     "config",
     "settings"
 ]
+
+def main():
+    settings.set_profile("default")
+    print(settings.profile.default_resolution)
+    settings.set_profile("540p")
+    print(settings.profile.default_resolution)
+    print(settings.profile.get("env"))
+    print(settings.profiles["default"])
+    print(settings.profiles[("default")].get("env"))
+    print(settings.profiles[("default", "540p")].get("env"))
+    print(settings.profiles[("default", "540p")].get("env"))
+    print(settings.profiles[("default", "540p", "proxy")].get("env"))
+
+if __name__ == "__main__":
+    main()
