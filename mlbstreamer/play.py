@@ -140,6 +140,21 @@ def play_stream(game_specifier, resolution=None,
 
     media_state = media["mediaState"]
 
+    # Get any team-specific profile overrides, and apply settings for them
+    profiles = tuple([ list(d.values())[0]
+                 for d in config.settings.profile_map.get("team", {})
+                 if list(d.keys())[0] in [
+                         away_team_abbrev, home_team_abbrev
+                 ] ])
+
+    if len(profiles):
+        # override proxies for team, if defined
+        if len(config.settings.profiles[profiles].proxies):
+            old_proxies = state.session.proxies
+            state.session.proxies = config.settings.profiles[profiles].proxies
+            state.session.refresh_access_token(clear_token=True)
+            state.session.proxies = old_proxies
+
     if "playbacks" in media:
         playback = media["playbacks"][0]
         media_url = playback["location"]

@@ -92,7 +92,8 @@ class MLBSession(object):
             token=None,
             access_token=None,
             access_token_expiry=None,
-            no_cache=False
+            proxies=None,
+            no_cache=False,
     ):
 
         self.session = requests.Session()
@@ -108,7 +109,8 @@ class MLBSession(object):
             ("client_api_key", client_api_key),
             ("token", token),
             ("access_token", access_token),
-            ("access_token_expiry", access_token_expiry)
+            ("access_token_expiry", access_token_expiry),
+            ("proxies", proxies)
         ])
         self.no_cache = no_cache
         self._cache_responses = False
@@ -173,6 +175,17 @@ class MLBSession(object):
     @property
     def password(self):
         return self._state.password
+
+    @property
+    def proxies(self):
+        return self._state.proxies
+
+    @proxies.setter
+    def proxies(self, value):
+        # Override proxy environment variables if proxies are defined on session
+        self.session.trust_env = (len(value) == 0)
+        self._state.proxies = value
+        self.session.proxies.update(value)
 
     @classmethod
     def new(cls, **kwargs):
