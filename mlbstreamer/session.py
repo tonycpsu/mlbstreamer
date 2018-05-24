@@ -360,22 +360,21 @@ class MLBSession(object):
 
     @property
     def access_token(self):
-        logger.debug("getting access token")
         if not self._state.access_token or not self.access_token_expiry or \
                 self.access_token_expiry < datetime.now(tz=pytz.UTC):
-
             try:
-                self._state.access_token, self.access_token_expiry = self._get_access_token()
+                self.refresh_access_token()
             except requests.exceptions.HTTPError:
                 # Clear token and then try to get a new access_token
-                self.token = None
-                self._state.access_token, self.access_token_expiry = self._get_access_token()
+                self.refresh_access_token(clear_token=True)
 
-        self.save()
         logger.debug("access_token: %s" %(self._state.access_token))
         return self._state.access_token
 
-    def _get_access_token(self):
+    def refresh_access_token(self, clear_token=False):
+        logger.debug("refreshing access token")
+        if clear_token:
+            self.token = None
         headers = {
             "Authorization": "Bearer %s" % (self.client_api_key),
             "User-agent": USER_AGENT,
@@ -399,10 +398,10 @@ class MLBSession(object):
         response.raise_for_status()
         token_response = response.json()
 
-        token_expiry = datetime.now(tz=pytz.UTC) + \
+        self.access_token_expiry = datetime.now(tz=pytz.UTC) + \
                        timedelta(seconds=token_response["expires_in"])
-
-        return token_response["access_token"], token_expiry
+        self._state.access_token = token_response["access_token"]
+        self.save()
 
     def content(self, game_id):
 
