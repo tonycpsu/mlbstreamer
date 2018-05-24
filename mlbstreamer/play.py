@@ -327,7 +327,7 @@ def main():
     parser.add_argument("game", metavar="game",
                         nargs="?",
                         help="team abbreviation or MLB game ID")
-    options, args = parser.parse_known_args()
+    options, args = parser.parse_known_args(args)
 
     global logger
     logger = logging.getLogger("mlbstreamer")
