@@ -183,7 +183,8 @@ class MLBSession(object):
     @proxies.setter
     def proxies(self, value):
         # Override proxy environment variables if proxies are defined on session
-        self.session.trust_env = (len(value) == 0)
+        if value is not None:
+            self.session.trust_env = (len(value) == 0)
         self._state.proxies = value
         self.session.proxies.update(value)
 
