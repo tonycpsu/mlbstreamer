@@ -31,41 +31,6 @@ from .state import memo
 
 USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:56.0) "
               "Gecko/20100101 Firefox/56.0.4")
-PLATFORM = "macintosh"
-
-BAM_SDK_VERSION="3.0"
-
-API_KEY_URL= "https://www.mlb.com/tv/g490865/"
-API_KEY_RE = re.compile(r'"apiKey":"([^"]+)"')
-CLIENT_API_KEY_RE = re.compile(r'"clientApiKey":"([^"]+)"')
-
-TOKEN_URL_TEMPLATE = (
-    "https://media-entitlement.mlb.com/jwt"
-    "?ipid={ipid}&fingerprint={fingerprint}==&os={platform}&appname=mlbtv_web"
-)
-
-GAME_CONTENT_URL_TEMPLATE="http://statsapi.mlb.com/api/v1/game/{game_id}/content"
-
-# GAME_FEED_URL = "http://statsapi.mlb.com/api/v1/game/{game_id}/feed/live"
-
-SCHEDULE_TEMPLATE=(
-    "http://statsapi.mlb.com/api/v1/schedule"
-    # "https://statsapi.web.nhl.com/api/v1/schedule"
-    "?sportId={sport_id}&startDate={start}&endDate={end}"
-    "&gameType={game_type}&gamePk={game_id}"
-    "&teamId={team_id}"
-    "&hydrate=linescore,team,game(content(summary,media(epg)),tickets)"
-)
-
-ACCESS_TOKEN_URL = "https://edge.bamgrid.com/token"
-
-STREAM_URL_TEMPLATE="https://edge.svcs.mlb.com/media/{media_id}/scenarios/browser"
-
-AIRINGS_URL_TEMPLATE=(
-    "https://search-api-mlbtv.mlb.com/svc/search/v2/graphql/persisted/query/"
-    "core/Airings?variables={{%22partnerProgramIds%22%3A[%22{game_id}%22]}}"
-)
-
 
 # Default cache duration to 60 seconds
 CACHE_DURATION_SHORT = 60 # 60 seconds
@@ -80,6 +45,13 @@ class StreamSessionException(Exception):
     pass
 
 class StreamSession(object):
+    """
+    Top-level stream session interface
+
+    Individual stream providers can be implemented by inheriting from this class
+    and implementing methods for login flow, getting streams, etc.
+    """
+
 
     # SESSION_FILE=os.path.join(config.CONFIG_DIR, "session")
 
@@ -90,13 +62,9 @@ class StreamSession(object):
     def __init__(
             self,
             username, password,
-            api_key=None,
-            client_api_key=None,
-            token=None,
-            access_token=None,
-            access_token_expiry=None,
             proxies=None,
             no_cache=False,
+            *args, **kwargs
     ):
 
         self.session = requests.Session()
@@ -108,11 +76,6 @@ class StreamSession(object):
         self._state = AttrDict([
             ("username", username),
             ("password", password),
-            ("api_key", api_key),
-            ("client_api_key", client_api_key),
-            ("token", token),
-            ("access_token", access_token),
-            ("access_token_expiry", access_token_expiry),
             ("proxies", proxies)
         ])
         self.no_cache = no_cache
@@ -125,18 +88,22 @@ class StreamSession(object):
         self.cache_purge()
         self.login()
 
+    @classmethod
+    def session_type(cls):
+        return cls.__name__.replace("StreamSession", "").lower()
+
     @property
     def SESSION_FILE(self):
-        session_type = self.__class__.__name__.replace("StreamSession", "")
-        return os.path.join(config.CONFIG_DIR, f"{session_type}session")
+        return os.path.join(config.CONFIG_DIR, f"{self.session_type()}.session")
 
     @classmethod
     def new(cls, **kwargs):
         try:
             return cls.load()
         except:
-            return cls(username=config.settings.profile.username,
-                       password=config.settings.profile.password,
+            provider = config.settings.profile.providers.get(cls.session_type())
+            return cls(username=provider.username,
+                       password=provider.password,
                        **kwargs)
 
     @classmethod
@@ -157,7 +124,8 @@ class StreamSession(object):
         self.session.cookies.save(COOKIE_FILE)
 
 
-class MLBStreamSession(StreamSession):
+    def get_cookie(self, name):
+        return requests.utils.dict_from_cookiejar(self.session.cookies).get(name)
 
     def __getattr__(self, attr):
         if attr in ["delete", "get", "head", "options", "post", "put", "patch"]:
@@ -264,6 +232,102 @@ class MLBStreamSession(StreamSession):
             "WHERE last_seen < datetime('now', '-%d days')" %(days)
         )
 
+class BAMStreamSessionMixin(object):
+    """
+    StreamSession subclass for BAMTech Media stream providers, which currently
+    includes MLB.tv and NHL.tv
+    """
+
+    @memo(region="short")
+    def schedule(
+            self,
+            sport_id=None,
+            start=None,
+            end=None,
+            game_type=None,
+            team_id=None,
+            game_id=None,
+    ):
+
+        logger.debug(
+            "getting schedule: %s, %s, %s, %s, %s, %s" %(
+                sport_id,
+                start,
+                end,
+                game_type,
+                team_id,
+                game_id
+            )
+        )
+        url = self.SCHEDULE_TEMPLATE.format(
+            sport_id = sport_id if sport_id else "",
+            start = start.strftime("%Y-%m-%d") if start else "",
+            end = end.strftime("%Y-%m-%d") if end else "",
+            game_type = game_type if game_type else "",
+            team_id = team_id if team_id else "",
+            game_id = game_id if game_id else ""
+        )
+        with self.cache_responses_short():
+            return self.get(url).json()
+
+
+
+class MLBStreamSession(BAMStreamSessionMixin, StreamSession):
+
+    SCHEDULE_TEMPLATE = (
+        "http://statsapi.mlb.com/api/v1/schedule"
+        "?sportId={sport_id}&startDate={start}&endDate={end}"
+        "&gameType={game_type}&gamePk={game_id}"
+        "&teamId={team_id}"
+        "&hydrate=linescore,team,game(content(summary,media(epg)),tickets)"
+    )
+
+    PLATFORM = "macintosh"
+    BAM_SDK_VERSION = "3.0"
+
+    API_KEY_URL = "https://www.mlb.com/tv/g490865/"
+
+    API_KEY_RE = re.compile(r'"apiKey":"([^"]+)"')
+
+    CLIENT_API_KEY_RE = re.compile(r'"clientApiKey":"([^"]+)"')
+
+    TOKEN_URL_TEMPLATE = (
+        "https://media-entitlement.mlb.com/jwt"
+        "?ipid={ipid}&fingerprint={fingerprint}==&os={platform}&appname=mlbtv_web"
+    )
+
+    GAME_CONTENT_URL_TEMPLATE="http://statsapi.mlb.com/api/v1/game/{game_id}/content"
+
+    ACCESS_TOKEN_URL = "https://edge.bamgrid.com/token"
+
+    STREAM_URL_TEMPLATE="https://edge.svcs.mlb.com/media/{media_id}/scenarios/browser"
+
+    AIRINGS_URL_TEMPLATE=(
+        "https://search-api-mlbtv.mlb.com/svc/search/v2/graphql/persisted/query/"
+        "core/Airings?variables={{%22partnerProgramIds%22%3A[%22{game_id}%22]}}"
+    )
+
+    def __init__(
+            self,
+            username, password,
+            api_key=None,
+            client_api_key=None,
+            token=None,
+            access_token=None,
+            access_token_expiry=None,
+            *args, **kwargs
+    ):
+        super(MLBStreamSession, self).__init__(
+            username, password,
+            *args, **kwargs
+        )
+        self._state.api_key = api_key
+        self._state.client_api_key = api_key
+        self._state.token = token
+        self._state.access_token = access_token
+        self._state.access_token_expirt = access_token_expiry
+
+
     def login(self):
 
         logger.debug("checking for existing log in")
@@ -314,9 +378,6 @@ class MLBStreamSession(StreamSession):
             return False
 
 
-    def get_cookie(self, name):
-        return requests.utils.dict_from_cookiejar(self.session.cookies).get(name)
-
     @property
     def ipid(self):
         return self.get_cookie("ipid")
@@ -349,20 +410,21 @@ class MLBStreamSession(StreamSession):
         scripts = data.xpath(".//script")
         for script in scripts:
             if script.text and "apiKey" in script.text:
-                self._state.api_key = API_KEY_RE.search(script.text).groups()[0]
+                self._state.api_key = self.API_KEY_RE.search(script.text).groups()[0]
             if script.text and "clientApiKey" in script.text:
-                self._state.client_api_key = CLIENT_API_KEY_RE.search(script.text).groups()[0]
+                self._state.client_api_key = self.CLIENT_API_KEY_RE.search(script.text).groups()[0]
         self.save()
 
     @property
     def token(self):
-        logger.debug("getting token")
         if not self._state.token:
+            logger.debug("getting token")
             headers = {"x-api-key": self.api_key}
 
             response = self.get(
-                TOKEN_URL_TEMPLATE.format(
-                    ipid=self.ipid, fingerprint=self.fingerprint, platform=PLATFORM
+                self.TOKEN_URL_TEMPLATE.format(
+                    ipid=self.ipid, fingerprint=self.fingerprint,
+                    platform=self.PLATFORM
                 ),
                 headers=headers
             )
@@ -405,8 +467,8 @@ class MLBStreamSession(StreamSession):
             "Authorization": "Bearer %s" % (self.client_api_key),
             "User-agent": USER_AGENT,
             "Accept": "application/vnd.media-service+json; version=1",
-            "x-bamsdk-version": BAM_SDK_VERSION,
-            "x-bamsdk-platform": PLATFORM,
+            "x-bamsdk-version": self.BAM_SDK_VERSION,
+            "x-bamsdk-platform": self.PLATFORM,
             "origin": "https://www.mlb.com"
         }
         data = {
@@ -417,7 +479,7 @@ class MLBStreamSession(StreamSession):
             "subject_token_type": "urn:ietf:params:oauth:token-type:jwt"
         }
         response = self.post(
-            ACCESS_TOKEN_URL,
+            self.ACCESS_TOKEN_URL,
             data=data,
             headers=headers
         )
@@ -431,46 +493,19 @@ class MLBStreamSession(StreamSession):
 
     def content(self, game_id):
 
-        return self.get(GAME_CONTENT_URL_TEMPLATE.format(game_id=game_id)).json()
+        return self.get(
+            self.GAME_CONTENT_URL_TEMPLATE.format(game_id=game_id)).json()
 
     # def feed(self, game_id):
 
     #     return self.get(GAME_FEED_URL.format(game_id=game_id)).json()
 
     @memo(region="short")
-    def schedule(
-            self,
-            sport_id=None,
-            start=None,
-            end=None,
-            game_type=None,
-            team_id=None,
-            game_id=None,
-    ):
+    def get_epgs(self, game_id, title=None):
 
-        logger.debug(
-            "getting schedule: %s, %s, %s, %s, %s, %s" %(
-                sport_id,
-                start,
-                end,
-                game_type,
-                team_id,
-                game_id
-            )
-        )
-        url = SCHEDULE_TEMPLATE.format(
-            sport_id = sport_id if sport_id else "",
-            start = start.strftime("%Y-%m-%d") if start else "",
-            end = end.strftime("%Y-%m-%d") if end else "",
-            game_type = game_type if game_type else "",
-            team_id = team_id if team_id else "",
-            game_id = game_id if game_id else ""
-        )
-        with self.cache_responses_short():
-            return self.get(url).json()
+        if not title:
+            title = "MLBTV"
 
-    @memo(region="short")
-    def get_epgs(self, game_id, title="MLBTV"):
         schedule = self.schedule(game_id=game_id)
         try:
             # Get last date for games that have been rescheduled to a later date
@@ -488,7 +523,7 @@ class MLBStreamSession(StreamSession):
     def get_media(self,
                   game_id,
                   media_id=None,
-                  title="MLBTV",
+                  title=None,
                   preferred_stream=None,
                   call_letters=None):
 
@@ -516,7 +551,7 @@ class MLBStreamSession(StreamSession):
 
     def airings(self, game_id):
 
-        airings_url = AIRINGS_URL_TEMPLATE.format(game_id = game_id)
+        airings_url = self.AIRINGS_URL_TEMPLATE.format(game_id = game_id)
         airings = self.get(
             airings_url
         ).json()["data"]["Airings"]
@@ -595,22 +630,15 @@ class MLBStreamSession(StreamSession):
 
     def get_stream(self, media_id):
 
-        # try:
-        #     media = next(self.get_media(game_id))
-        # except StopIteration:
-        #     logger.debug("no media for stream")
-        #     return
-        # media_id = media["mediaId"]
-
         headers={
             "Authorization": self.access_token,
             "User-agent": USER_AGENT,
             "Accept": "application/vnd.media-service+json; version=1",
             "x-bamsdk-version": "3.0",
-            "x-bamsdk-platform": PLATFORM,
+            "x-bamsdk-platform": self.PLATFORM,
             "origin": "https://www.mlb.com"
         }
-        stream_url = STREAM_URL_TEMPLATE.format(media_id=media_id)
+        stream_url = self.STREAM_URL_TEMPLATE.format(media_id=media_id)
         logger.info("getting stream %s" %(stream_url))
         stream = self.get(
             stream_url,
@@ -621,6 +649,123 @@ class MLBStreamSession(StreamSession):
             return None
         return stream
 
+
+
+class NHLStreamSession(StreamSession, BAMStreamSessionMixin):
+
+    AUTH = b"web_nhl-v1.0.0:2d1d846ea3b194a18ef40ac9fbce97e3"
+
+    SCHEDULE_TEMPLATE = (
+        "https://statsapi.web.nhl.com/api/v1/schedule"
+        "?sportId={sport_id}&startDate={start}&endDate={end}"
+        "&gameType={game_type}&gamePk={game_id}"
+        "&teamId={team_id}"
+        "&hydrate=linescore,team,game(content(summary,media(epg)),tickets)"
+    )
+
+    def login():
+
+        auth = base64.b64encode(self.AUTH).decode("utf-8")
+
+        token_url = "https://user.svc.nhl.com/oauth/token?grant_type=client_credentials"
+
+        headers = {
+            "Authorization": f"Basic {auth}",
+            # "Referer": "https://www.nhl.com/login/freeGame?forwardUrl=https%3A%2F%2Fwww.nhl.com%2Ftv%2F2018020013%2F221-2000552%2F61332703",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Accept-Language": "en-US,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Origin": "https://www.nhl.com"
+        }
+
+        res = session.post(token_url, headers=headers)
+        token = json.loads(res.text)["access_token"]
+        # raise Exception(token)
+        # print(dump.dump_all(res).decode("utf-8"))
+
+        login_url="https://gateway.web.nhl.com/ws/subscription/flow/nhlPurchase.login"
+
+        auth = base64.b64encode(b"web_nhl-v1.0.0:2d1d846ea3b194a18ef40ac9fbce97e3")
+
+        params = {
+            "nhlCredentials":  {
+                "email": self.username,
+                "password": self.password
+            }
+        }
+
+        headers = {
+            "Authorization": token,
+            "Origin": "https://www.nhl.com",
+            # "Referer": "https://www.nhl.com/login/freeGame?forwardUrl=https%3A%2F%2Fwww.nhl.com%2Ftv%2F2018020013%2F221-2000552%2F61332703",
+        }
+
+        res = session.post(
+            login_url,
+            json=params,
+            headers=headers
+        )
+        return (res.status_code == 200)
+
+
+    def get_media(self,
+                  game_id,
+                  media_id=None,
+                  title=None,
+                  preferred_stream=None,
+                  call_letters=None):
+
+        params = {
+            "eventId": game_id,
+            "format": "json",
+            "platform": "WEB_MEDIAPLAYER",
+            "subject": "NHLTV",
+            "_": "1538708097285"
+        }
+        url = "https://mf.svc.nhl.com/ws/media/mf/v2.4/stream"
+
+        res = session.get(
+            url,
+            params=params
+        )
+        j = res.json()
+        return j
+        print(json.dumps(j, sort_keys=True,
+                                   indent=4, separators=(',', ': ')))
+        session_key = j["session_key"]
+        content_id = j["user_verified_event"][0]["user_verified_content"][0]["content_id"]
+        # raise Exception(session_key)
+
+        url = "https://mf.svc.nhl.com/ws/media/mf/v2.4/stream"
+
+        params = {
+            "contentId": content_id,
+            "playbackScenario": "HTTP_CLOUD_WIRED_WEB",
+            "sessionKey": session_key,
+            "auth": "response",
+            "platform": "WEB_MEDIAPLAYER",
+            "_": "1538708097285"
+        }
+        res = session.get(
+            url,
+            params=params
+        )
+        j = res.json()
+        print(json.dumps(j, sort_keys=True,
+                                   indent=4, separators=(',', ': ')))
+
+        media_url = j["user_verified_event"][0]["user_verified_content"][0]["user_verified_media_item"][0]["url"]
+        media_auth = next(x["attributeValue"]
+                          for x in j["session_info"]["sessionAttributes"]
+                          if x["attributeName"] == "mediaAuth_v2"
+        )
+
+        session.cookies.set_cookie(
+            Cookie(0, 'mediaAuth_v2', media_auth,
+                   '80', '80', '.nhl.com',
+                   None, None, '/', True, False, 4102444800, None, None, None, {}),
+
+        )
 
 
 def main():
