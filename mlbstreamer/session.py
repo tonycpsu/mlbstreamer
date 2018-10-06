@@ -50,6 +50,7 @@ GAME_CONTENT_URL_TEMPLATE="http://statsapi.mlb.com/api/v1/game/{game_id}/content
 
 SCHEDULE_TEMPLATE=(
     "http://statsapi.mlb.com/api/v1/schedule"
+    # "https://statsapi.web.nhl.com/api/v1/schedule"
     "?sportId={sport_id}&startDate={start}&endDate={end}"
     "&gameType={game_type}&gamePk={game_id}"
     "&teamId={team_id}"
@@ -65,9 +66,6 @@ AIRINGS_URL_TEMPLATE=(
     "core/Airings?variables={{%22partnerProgramIds%22%3A[%22{game_id}%22]}}"
 )
 
-SESSION_FILE=os.path.join(config.CONFIG_DIR, "session")
-COOKIE_FILE=os.path.join(config.CONFIG_DIR, "cookies")
-CACHE_FILE=os.path.join(config.CONFIG_DIR, "cache.sqlite")
 
 # Default cache duration to 60 seconds
 CACHE_DURATION_SHORT = 60 # 60 seconds
@@ -75,10 +73,15 @@ CACHE_DURATION_MEDIUM = 60*60*24 # 1 day
 CACHE_DURATION_LONG = 60*60*24*30  # 30 days
 CACHE_DURATION_DEFAULT = CACHE_DURATION_SHORT
 
-class MLBSessionException(Exception):
+COOKIE_FILE=os.path.join(config.CONFIG_DIR, "cookies")
+CACHE_FILE=os.path.join(config.CONFIG_DIR, "cache.sqlite")
+
+class StreamSessionException(Exception):
     pass
 
-class MLBSession(object):
+class StreamSession(object):
+
+    # SESSION_FILE=os.path.join(config.CONFIG_DIR, "session")
 
     HEADERS = {
         "User-agent": USER_AGENT
@@ -121,6 +124,40 @@ class MLBSession(object):
         self.cursor = self.conn.cursor()
         self.cache_purge()
         self.login()
+
+    @property
+    def SESSION_FILE(self):
+        session_type = self.__class__.__name__.replace("StreamSession", "")
+        return os.path.join(config.CONFIG_DIR, f"{session_type}session")
+
+    @classmethod
+    def new(cls, **kwargs):
+        try:
+            return cls.load()
+        except:
+            return cls(username=config.settings.profile.username,
+                       password=config.settings.profile.password,
+                       **kwargs)
+
+    @classmethod
+    def destroy(cls):
+        if os.path.exists(cls.COOKIE_FILE):
+            os.remove(cls.COOKIE_FILE)
+        if os.path.exists(cls.SESSION_FILE):
+            os.remove(cls.SESSION_FILE)
+
+    @classmethod
+    def load(cls):
+        state = yaml.load(open(cls.SESSION_FILE), Loader=AttrDictYAMLLoader)
+        return cls(**state)
+
+    def save(self):
+        with open(self.SESSION_FILE, 'w') as outfile:
+            yaml.dump(self._state, outfile, default_flow_style=False)
+        self.session.cookies.save(COOKIE_FILE)
+
+
+class MLBStreamSession(StreamSession):
 
     def __getattr__(self, attr):
         if attr in ["delete", "get", "head", "options", "post", "put", "patch"]:
@@ -188,31 +225,6 @@ class MLBSession(object):
         self._state.proxies = value
         self.session.proxies.update(value)
 
-    @classmethod
-    def new(cls, **kwargs):
-        try:
-            return cls.load()
-        except:
-            return cls(username=config.settings.profile.username,
-                       password=config.settings.profile.password,
-                       **kwargs)
-
-    @classmethod
-    def destroy(cls):
-        if os.path.exists(COOKIE_FILE):
-            os.remove(COOKIE_FILE)
-        if os.path.exists(SESSION_FILE):
-            os.remove(SESSION_FILE)
-
-    @classmethod
-    def load(cls):
-        state = yaml.load(open(SESSION_FILE), Loader=AttrDictYAMLLoader)
-        return cls(**state)
-
-    def save(self):
-        with open(SESSION_FILE, 'w') as outfile:
-            yaml.dump(self._state, outfile, default_flow_style=False)
-        self.session.cookies.save(COOKIE_FILE)
 
     @contextmanager
     def cache_responses(self, duration=CACHE_DURATION_DEFAULT):
@@ -261,7 +273,7 @@ class MLBSession(object):
 
         # res = self.get(initial_url)
         # if not res.status_code == 200:
-        #     raise MLBSessionException(res.content)
+        #     raise StreamSessionException(res.content)
 
         data = {
             "uri": "/account/login_register.jsp",
@@ -285,7 +297,7 @@ class MLBSession(object):
         )
 
         if not (self.ipid and self.fingerprint):
-            raise MLBSessionException("Couldn't get ipid / fingerprint")
+            raise StreamSessionException("Couldn't get ipid / fingerprint")
 
         logger.debug("logged in: %s" %(self.ipid))
         self.save()
@@ -517,7 +529,7 @@ class MLBSession(object):
             airing = next(a for a in self.airings(game_id)
                           if a["mediaId"] == media_id)
         except StopIteration:
-            raise MLBSessionException("No airing for media %s" %(media_id))
+            raise StreamSessionException("No airing for media %s" %(media_id))
 
         start_timestamps = []
         try:
@@ -609,4 +621,18 @@ class MLBSession(object):
             return None
         return stream
 
-__all__ = ["MLBSession", "MLBSessionException"]
+
+
+def main():
+
+    from . import state
+
+    state.session = MLBStreamSession.new()
+    print(state.session.schedule(game_id=2018020013))
+
+if __name__ == "__main__":
+    main()
+
+
+
+__all__ = ["MLBStreamSession", "StreamSessionException"]

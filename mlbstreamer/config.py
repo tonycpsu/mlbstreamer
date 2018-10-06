@@ -126,7 +126,7 @@ class Config(Tree):
 
     def init_config(self):
 
-        from .session import MLBSession, MLBSessionException
+        from .session import StreamSession, StreamSessionException
 
         def mkdir_p(path):
             try:
@@ -141,7 +141,7 @@ class Config(Tree):
                 if player:
                     yield player
 
-        MLBSession.destroy()
+        StreamSession.destroy()
         if os.path.exists(CONFIG_FILE):
             os.remove(CONFIG_FILE)
 
@@ -157,11 +157,11 @@ class Config(Tree):
                 'Enter password: ',
                 is_password=True, validator=NotEmptyValidator())
             try:
-                s = MLBSession(self.profile.username,
+                s = StreamSession(self.profile.username,
                                self.profile.password)
                 s.login()
                 break
-            except MLBSessionException:
+            except StreamSessionException:
                 print("Couldn't login to MLB, please check your credentials.")
                 continue
 

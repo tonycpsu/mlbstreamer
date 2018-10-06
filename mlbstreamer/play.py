@@ -359,7 +359,7 @@ def main():
     if not options.game:
         parser.error("option game")
 
-    state.session = MLBSession.new(no_cache=options.no_cache)
+    state.session = MLBStreamSession.new(no_cache=options.no_cache)
 
     preferred_stream = None
     date = None
