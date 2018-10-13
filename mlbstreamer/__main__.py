@@ -29,7 +29,7 @@ from .state import memo
 from . import config
 from . import play
 from . import widgets
-from .util import *
+from . import utils
 from .session import *
 
 
@@ -204,8 +204,12 @@ class GamesDataTable(DataTable):
                         pytz.timezone(config.settings.profile.time_zone)
                     )
 
-                hide_spoilers = set([away_abbrev, home_abbrev]).intersection(
-                    set(config.settings.profile.get("hide_spoiler_teams", [])))
+                hide_spoiler_teams = config.settings.profile.get("hide_spoiler_teams", [])
+                if isinstance(hide_spoiler_teams, bool):
+                    hide_spoilers = hide_spoiler_teams
+                else:
+                    hide_spoilers = set([away_abbrev, home_abbrev]).intersection(
+                        set(hide_spoiler_teams))
 
                 if "linescore" in g and len(g["linescore"]["innings"]):
                     self.line_score_table = LineScoreDataTable.from_mlb_api(
@@ -512,7 +516,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--date", help="game date",
-                        type=valid_date,
+                        type=utils.valid_date,
                         default=today)
     parser.add_argument("-r", "--resolution", help="stream resolution",
                         default=config.settings.profile.default_resolution)

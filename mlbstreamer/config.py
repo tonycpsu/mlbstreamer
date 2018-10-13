@@ -19,7 +19,7 @@ from prompt_toolkit.validation import Validator, ValidationError
 from prompt_toolkit.shortcuts import confirm
 from prompt_toolkit.shortcuts import prompt
 import getpass
-from .util import *
+from .utils import *
 
 CONFIG_DIR=os.path.expanduser("~/.config/mlbstreamer")
 CONFIG_FILE=os.path.join(CONFIG_DIR, "config.yaml")

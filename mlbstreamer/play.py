@@ -9,14 +9,27 @@ import argparse
 from datetime import datetime, timedelta
 import pytz
 import shlex
+from itertools import chain
 
 import dateutil.parser
 from orderedattrdict import AttrDict
 
 from . import config
 from . import state
-from .util import *
-from .session import *
+from . import session
+from . import utils
+# from .session import *
+
+
+def handle_exception(exc_type, exc_value, exc_traceback):
+    state.session.save()
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+sys.excepthook = handle_exception
 
 class MLBPlayException(Exception):
     pass
@@ -35,9 +48,9 @@ def play_stream(game_specifier, resolution=None,
     live = False
     team = None
     game_number = 1
-    sport_code = "mlb" # default sport is MLB
+    # sport_code = "mlb" # default sport is MLB
 
-    media_title = "MLBTV"
+    # media_title = "MLBTV"
     media_id = None
     allow_stdout=False
 
@@ -59,47 +72,22 @@ def play_stream(game_specifier, resolution=None,
         if "/" in team:
             (sport_code, team) = team.split("/")
 
+        teams =  state.session.teams(season=game_date.year)
+        team_id = teams.get(team)
 
-        if sport_code != "mlb":
-            media_title = "MiLBTV"
-            raise MLBPlayException("Sorry, MiLB.tv streams are not yet supported")
-
-        sports_url = (
-            "http://statsapi.mlb.com/api/v1/sports"
-        )
-        with state.session.cache_responses_long():
-            sports = state.session.get(sports_url).json()
-
-        sport = next(s for s in sports["sports"] if s["code"] == sport_code)
-
-        season = game_date.year
-        teams_url = (
-            "http://statsapi.mlb.com/api/v1/teams"
-            "?sportId={sport}&season={season}".format(
-                sport=sport["id"],
-                season=season
-            )
-        )
-
-        with state.session.cache_responses_long():
-            teams = AttrDict(
-                (team["abbreviation"].lower(), team["id"])
-                for team in sorted(state.session.get(teams_url).json()["teams"],
-                                   key=lambda t: t["fileCode"])
-            )
-
-        if team not in teams:
+        if not team:
             msg = "'%s' not a valid team code, must be one of:\n%s" %(
                 game_specifier, " ".join(teams)
             )
             raise argparse.ArgumentTypeError(msg)
 
-        schedule = state.session.schedule(
-            start = game_date,
-            end = game_date,
-            sport_id = sport["id"],
-            team_id = teams[team]
-        )
+    schedule = state.session.schedule(
+        start = game_date,
+        end = game_date,
+        # sport_id = sport["id"],
+        team_id = team_id
+    )
+    # raise Exception(schedule)
 
 
     try:
@@ -129,14 +117,14 @@ def play_stream(game_specifier, resolution=None,
         media = next(state.session.get_media(
             game_id,
             media_id = media_id,
-            title=media_title,
+            # title=media_title,
             preferred_stream=preferred_stream,
             call_letters = call_letters
         ))
     except StopIteration:
         raise MLBPlayException("no matching media for game %d" %(game_id))
 
-    media_id = media["mediaId"] if "mediaId" in media else media["guid"]
+    # media_id = media["mediaId"] if "mediaId" in media else media["guid"]
 
     media_state = media["mediaState"]
 
@@ -159,10 +147,11 @@ def play_stream(game_specifier, resolution=None,
         playback = media["playbacks"][0]
         media_url = playback["location"]
     else:
-        stream = state.session.get_stream(media_id)
+        stream = state.session.get_stream(media)
 
         try:
-            media_url = stream["stream"]["complete"]
+            # media_url = stream["stream"]["complete"]
+            media_url = stream.url
         except TypeError:
             raise MLBPlayException("no stream URL for game %d" %(game_id))
 
@@ -197,15 +186,32 @@ def play_stream(game_specifier, resolution=None,
         offset_timestamp = str(offset_delta)
         logger.info("starting at time offset %s" %(offset))
 
+    header_args = []
+    cookie_args = []
+
+    if state.session.headers:
+        header_args = list(
+            chain.from_iterable([
+                ("--http-header", f"{k}={v}")
+            for k, v in state.session.headers.items()
+        ]))
+
+    if state.session.cookies:
+        cookie_args = list(
+            chain.from_iterable([
+                ("--http-cookie", f"{c.name}={c.value}")
+            for c in state.session.cookies
+        ]))
+
     cmd = [
         "streamlink",
         # "-l", "debug",
         "--player", config.settings.profile.player,
-        "--http-header",
-        "Authorization=%s" %(state.session.access_token),
+    ] + cookie_args + header_args + [
         media_url,
         resolution,
     ]
+
     if config.settings.profile.streamlink_args:
         cmd += shlex.split(config.settings.profile.streamlink_args)
 
@@ -320,7 +326,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument("-d", "--date", help="game date",
-                        type=valid_date,
+                        type=utils.valid_date,
                         default=today)
     parser.add_argument("-g", "--game-number",
                         help="number of team game on date (for doubleheaders)",
@@ -337,15 +343,23 @@ def main():
                         nargs="?", const=True)
     parser.add_argument("--no-cache", help="do not use response cache",
                         action="store_true")
-    parser.add_argument("-v", "--verbose", action="count", default=0,
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-v", "--verbose", action="count", default=0,
                         help="verbose logging")
+    group.add_argument("-q", "--quiet", action="count", default=0,
+                        help="quiet logging")
+    parser.add_argument("provider", metavar="provider",
+                        help="stream provider")
     parser.add_argument("game", metavar="game",
                         nargs="?",
                         help="team abbreviation or MLB game ID")
     options, args = parser.parse_known_args(args)
 
-    global logger
-    logger = logging.getLogger("mlbstreamer")
+    # global logger
+    # logger = logging.getLogger("mlbstreamer")
+
+    utils.setup_logging(options.verbose - options.quiet)
+
     if options.verbose:
         logger.setLevel(logging.DEBUG)
         formatter = logging.Formatter("%(asctime)s [%(levelname)8s] %(message)s",
@@ -359,8 +373,9 @@ def main():
     if not options.game:
         parser.error("option game")
 
-    state.session = MLBStreamSession.new(no_cache=options.no_cache)
-
+    session_class = getattr(session, f"{options.provider.upper()}StreamSession")
+    state.session = session_class.new(no_cache=options.no_cache)
+    # raise Exception(state.session.__class__)
     preferred_stream = None
     date = None
 
