@@ -393,6 +393,16 @@ class MLBStreamSession(BAMStreamSessionMixin, StreamSession):
         "core/Airings?variables={{%22partnerProgramIds%22%3A[%22{game_id}%22]}}"
     )
 
+    RESOLUTIONS = AttrDict([
+        ("720p", "720p_alt"),
+        ("720p@30", "720p"),
+        ("540p", "540p"),
+        ("504p", "504p"),
+        ("360p", "360p"),
+        ("288p", "288p"),
+        ("224p", "224p")
+    ])
+
     def __init__(
             self,
             username, password,
@@ -747,6 +757,15 @@ class NHLStreamSession(BAMStreamSessionMixin, StreamSession):
         "&hydrate=linescore,team,game(content(summary,media(epg)),tickets)"
     )
 
+    RESOLUTIONS = AttrDict([
+        ("720p", "720p"),
+        ("540p", "540p"),
+        ("504p", "504p"),
+        ("360p", "360p"),
+        ("288p", "288p"),
+        ("216p", "216p")
+    ])
+
     def __init__(
             self,
             username, password,
@@ -915,7 +934,13 @@ class NHLStreamSession(BAMStreamSessionMixin, StreamSession):
         return stream
 
 
+def new(provider, *args, **kwargs):
+    session_class = globals().get(f"{provider.upper()}StreamSession")
+    return session_class.new(*args, **kwargs)
 
+PROVIDERS_RE = re.compile(r"(.+)StreamSession$")
+PROVIDERS = [ k.replace("StreamSession", "").lower()
+              for k in globals() if PROVIDERS_RE.search(k) ]
 
 
 def main():
@@ -936,8 +961,9 @@ def main():
 
     utils.setup_logging(options.verbose - options.quiet)
 
-    state.session = MLBStreamSession.new()
-    raise Exception(state.session.token)
+    # state.session = MLBStreamSession.new()
+    # raise Exception(state.session.token)
+    raise Exception(PROVIDERS)
 
     # state.session = NHLStreamSession.new()
     # raise Exception(state.session.session_key)

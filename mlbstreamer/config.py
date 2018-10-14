@@ -19,7 +19,6 @@ from prompt_toolkit.validation import Validator, ValidationError
 from prompt_toolkit.shortcuts import confirm
 from prompt_toolkit.shortcuts import prompt
 import getpass
-from .utils import *
 
 CONFIG_DIR=os.path.expanduser("~/.config/mlbstreamer")
 CONFIG_FILE=os.path.join(CONFIG_DIR, "config.yaml")
@@ -126,6 +125,11 @@ class Config(Tree):
 
     def init_config(self):
 
+        raise Exception("""
+        Sorry, this configurator needs to be updated  to reflect recent changes
+        to the config file.  Until this is fixed, use the sample config
+        """)
+
         from .session import StreamSession, StreamSessionException
 
         def mkdir_p(path):
@@ -203,16 +207,16 @@ class Config(Tree):
         print("\n".join(
             [ "\t%d: %s" %(n, l)
               for n, l in enumerate(
-                      MLB_HLS_RESOLUTION_MAP
+                      utils.MLB_HLS_RESOLUTION_MAP
               )]))
         print("Select a default video resolution for MLB.tv streams:")
         choice = int(
             prompt(
                 "Choice: ",
-                validator=RangeNumberValidator(maximum=len(MLB_HLS_RESOLUTION_MAP))))
+                validator=RangeNumberValidator(maximum=len(utils.MLB_HLS_RESOLUTION_MAP))))
         if choice is not None:
-            self.profile.default_resolution = MLB_HLS_RESOLUTION_MAP[
-                list(MLB_HLS_RESOLUTION_MAP.keys())[choice]
+            self.profile.default_resolution = utils.MLB_HLS_RESOLUTION_MAP[
+                list(utils.MLB_HLS_RESOLUTION_MAP.keys())[choice]
             ]
 
         print("Your system time zone seems to be %s." %(tz_local))

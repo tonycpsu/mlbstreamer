@@ -30,12 +30,12 @@ from . import config
 from . import play
 from . import widgets
 from . import utils
-from .session import *
-
+from . import session
 
 
 class UrwidLoggingHandler(logging.Handler):
 
+    pipe = None
     # def __init__(self, console):
 
     #     self.console = console
@@ -46,6 +46,8 @@ class UrwidLoggingHandler(logging.Handler):
 
     def emit(self, rec):
 
+        if not self.pipe:
+            return
         msg = self.format(rec)
         (ignore, ready, ignore) = select.select([], [self.pipe], [])
         if self.pipe in ready:
@@ -70,10 +72,10 @@ class Inning(AttrDict):
     pass
 
 
-class LineScoreDataTable(DataTable):
+class MLBLineScoreDataTable(DataTable):
 
     @classmethod
-    def from_mlb_api(cls, line_score,
+    def from_json(cls, line_score,
                      away_team=None, home_team=None,
                      hide_spoilers=False
     ):
@@ -108,9 +110,9 @@ class LineScoreDataTable(DataTable):
                     elif side in inning:
                         if isinstance(inning[side], dict) and "runs" in inning[side]:
                             setattr(line, str(i+1), parse_int(inning[side]["runs"]))
-                        else:
-                            if "runs" in inning[side]:
-                                inning_score.append(parse_int(inning[side]))
+                        # else:
+                        #     if "runs" in inning[side]:
+                        #         inning_score.append(parse_int(inning[side]))
                     else:
                         setattr(line, str(i+1), "X")
 
@@ -141,15 +143,85 @@ class LineScoreDataTable(DataTable):
 
 
             data.append(line)
-        # raise Exception([c.name for c in columns])
         return cls(columns, data=data)
 
-    def keypress(self, size, key):
-        key = super(LineScoreDataTable, self).keypress(size, key)
-        if key == "l":
-            logger.debug("enable")
-            self.line_score_table.enable_cell_selection()
-        return key
+    # def keypress(self, size, key):
+        # key = super(LineScoreDataTable, self).keypress(size, key)
+        # if key == "l":
+        #     logger.debug("enable")
+        #     self.line_score_table.enable_cell_selection()
+        # return key
+
+
+class NHLLineScoreDataTable(DataTable):
+
+    @classmethod
+    def from_json(cls, line_score,
+                     away_team=None, home_team=None,
+                     hide_spoilers=False
+    ):
+
+        columns = [
+            DataTableColumn("team", width=6, label="", align="right", padding=1),
+        ]
+
+        if "teams" in line_score:
+            tk = line_score["teams"]
+        else:
+            tk = line_score
+
+        data = []
+        for s, side in enumerate(["away", "home"]):
+
+            i = -1
+            line = AttrDict()
+            if isinstance(line_score["periods"], list):
+                for i, period in enumerate(line_score["periods"]):
+                    if not s:
+                        columns.append(
+                            DataTableColumn(str(i+1), label=str(i+1) if i < 3 else "O", width=3)
+                        )
+                        line.team = away_team
+                    else:
+                        line.team = home_team
+
+                    if hide_spoilers:
+                        setattr(line, str(i+1), "?")
+
+                    elif side in period:
+                        if isinstance(period[side], dict) and "goals" in period[side]:
+                            setattr(line, str(i+1), parse_int(period[side]["goals"]))
+                    else:
+                        setattr(line, str(i+1), "X")
+
+                for n in list(range(i+1, 3)):
+                    if not s:
+                        columns.append(
+                            DataTableColumn(str(n+1), label=str(n+1), width=3)
+                        )
+                    if hide_spoilers:
+                        setattr(line, str(n+1), "?")
+
+            if not s:
+                columns.append(
+                    DataTableColumn("empty", label="", width=3)
+                )
+
+            for stat in ["goals", "shotsOnGoal"]:
+                if not stat in tk[side]: continue
+
+                if not s:
+                    columns.append(
+                        DataTableColumn(stat, label=stat[0].upper(), width=3)
+                    )
+                if not hide_spoilers:
+                    setattr(line, stat, parse_int(tk[side][stat]))
+                else:
+                    setattr(line, stat, "?")
+
+
+            data.append(line)
+        return cls(columns, data=data)
 
 
 
@@ -165,12 +237,13 @@ class GamesDataTable(DataTable):
     ]
 
 
-    def __init__(self, sport_id, game_date, game_type=None, *args, **kwargs):
+    def __init__(self, provider, game_date, game_type=None, *args, **kwargs):
 
-        self.sport_id = sport_id
+        # self.sport_id = sport_id
+
+        self.provider = provider
         self.game_date = game_date
         self.game_type = game_type
-
         self.line_score_table = None
         if not self.game_type:
             self.game_type = ""
@@ -183,7 +256,7 @@ class GamesDataTable(DataTable):
     def query(self, *args, **kwargs):
 
         j = state.session.schedule(
-            sport_id=self.sport_id,
+            # sport_id=self.sport_id,
             start=self.game_date,
             end=self.game_date,
             game_type=self.game_type
@@ -210,9 +283,13 @@ class GamesDataTable(DataTable):
                 else:
                     hide_spoilers = set([away_abbrev, home_abbrev]).intersection(
                         set(hide_spoiler_teams))
-
-                if "linescore" in g and len(g["linescore"]["innings"]):
-                    self.line_score_table = LineScoreDataTable.from_mlb_api(
+                # import json
+                # raise Exception(json.dumps(g["linescore"], sort_keys=True,
+                                 # indent=4, separators=(',', ': ')))
+                if "linescore" in g:
+                    line_score_cls = globals().get(f"{self.provider.upper()}LineScoreDataTable")
+                    # and "innings" in g["linescore"] and len(g["linescore"]["innings"]):
+                    self.line_score_table = line_score_cls.from_json(
                             g["linescore"],
                             g["teams"]["away"]["team"]["abbreviation"],
                             g["teams"]["home"]["team"]["abbreviation"],
@@ -239,35 +316,49 @@ class GamesDataTable(DataTable):
 
 class ResolutionDropdown(Dropdown):
 
-    items = MLB_HLS_RESOLUTION_MAP
-
     label = "Resolution"
+
+    def __init__(self, resolutions, default=None):
+        self.resolutions = resolutions
+        super(ResolutionDropdown, self).__init__(resolutions, default)
+
+    @property
+    def items(self):
+        return self.resolutions
 
 class Toolbar(urwid.WidgetWrap):
 
     def __init__(self):
 
-        self.league_dropdown = Dropdown(AttrDict([
-                ("MLB", 1),
-                ("AAA", 11),
-            ]) , label="League")
+        # self.league_dropdown = Dropdown(AttrDict([
+        #         ("MLB", 1),
+        #         ("AAA", 11),
+        #     ]) , label="League")
+
+
+        self.provider_dropdown = Dropdown(AttrDict(
+            [ (p.upper(), p)
+              for p in session.PROVIDERS]
+        ) , label="Provider")
 
         self.live_stream_dropdown = Dropdown([
             "live",
             "from start"
         ], label="Live streams")
 
-        self.resolution_dropdown = ResolutionDropdown(
-            default=options.resolution
-        )
+        self.resolution_dropdown_placeholder = urwid.WidgetPlaceholder(urwid.Text(""))
         self.columns = urwid.Columns([
-            ('weight', 1, self.league_dropdown),
+            ('weight', 1, self.provider_dropdown),
             ('weight', 1, self.live_stream_dropdown),
-            ('weight', 1, self.resolution_dropdown),
+            ('weight', 1, self.resolution_dropdown_placeholder),
             # ("weight", 1, urwid.Padding(urwid.Text("")))
         ])
         self.filler = urwid.Filler(self.columns)
         super(Toolbar, self).__init__(self.filler)
+
+    @property
+    def provider(self):
+        return (self.provider_dropdown.selected_value)
 
     @property
     def sport_id(self):
@@ -280,6 +371,15 @@ class Toolbar(urwid.WidgetWrap):
     @property
     def start_from_beginning(self):
         return self.live_stream_dropdown.selected_label == "from start"
+
+
+    def set_resolutions(self, resolutions):
+
+        self.resolution_dropdown = ResolutionDropdown(
+            resolutions,
+            default=options.resolution
+        )
+        self.resolution_dropdown_placeholder.original_widget = self.resolution_dropdown
 
 
 class DateBar(urwid.WidgetWrap):
@@ -421,12 +521,17 @@ class WatchDialog(BasePopUp):
 
 class ScheduleView(BaseView):
 
-    def __init__(self, date):
+    def __init__(self, provider, date):
 
+        self.provider = provider
         self.game_date = date
+
+        state.session = state.session = session.new(provider)
         self.toolbar = Toolbar()
         self.datebar = DateBar(self.game_date)
-        self.table = GamesDataTable(self.toolbar.sport_id, self.game_date) # preseason
+        # self.table = GamesDataTable(self.toolbar.sport_id, self.game_date) # preseason
+        self.table = GamesDataTable(self.provider, self.game_date) # preseason
+
         urwid.connect_signal(self.table, "select",
                              lambda source, selection: self.open_watch_dialog(selection["game_id"]))
         self.pile  = urwid.Pile([
@@ -435,6 +540,9 @@ class ScheduleView(BaseView):
             ("weight", 1, self.table)
         ])
         self.pile.focus_position = 2
+
+        self.toolbar.set_resolutions(state.session.RESOLUTIONS)
+
         super(ScheduleView, self).__init__(self.pile)
 
     def open_watch_dialog(self, game_id):
@@ -481,6 +589,7 @@ class ScheduleView(BaseView):
         else:
             return key
 
+
     def watch(self, game_id,
               resolution=None, feed=None,
               offset=None, preferred_stream=None):
@@ -515,13 +624,33 @@ def main():
         config.settings.set_profile(options.profile)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("-d", "--date", help="game date",
-                        type=utils.valid_date,
-                        default=today)
+    # parser.add_argument("-d", "--date", help="game date",
+    #                     type=utils.valid_date,
+    #                     default=today)
     parser.add_argument("-r", "--resolution", help="stream resolution",
                         default=config.settings.profile.default_resolution)
-    parser.add_argument("-v", "--verbose", action="store_true")
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument("-v", "--verbose", action="count", default=0,
+                        help="verbose logging")
+    group.add_argument("-q", "--quiet", action="count", default=0,
+                        help="quiet logging")
+    parser.add_argument("game", metavar="game",
+                        help="game specifier", nargs="?")
     options, args = parser.parse_known_args()
+
+    utils.setup_logging(options.verbose - options.quiet)
+
+    try:
+        (provider, game_date) = options.game.split("/", 1)
+    except (ValueError, AttributeError):
+        if options.game in session.PROVIDERS:
+            provider = options.game
+            game_date = datetime.now().date()
+        else:
+            provider = list(config.settings.profile.providers.keys())[0]
+            game_date = dateutil.parser.parse(options.game)
+
+
 
     log_file = os.path.join(config.CONFIG_DIR, "mlbstreamer.log")
 
@@ -545,8 +674,6 @@ def main():
 
     logger.debug("mlbstreamer starting")
 
-    state.session = MLBStreamSession.new()
-
     entries = Dropdown.get_palette_entries()
     entries.update(ScrollingListBox.get_palette_entries())
     entries.update(DataTable.get_palette_entries())
@@ -555,7 +682,7 @@ def main():
     screen = urwid.raw_display.Screen()
     screen.set_terminal_properties(256)
 
-    view = ScheduleView(options.date)
+    view = ScheduleView(provider, game_date)
 
     log_console = widgets.ConsoleWindow()
     # log_box = urwid.BoxAdapter(urwid.LineBox(log_console), 10)

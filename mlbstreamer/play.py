@@ -48,6 +48,7 @@ def play_stream(game_specifier, resolution=None,
     live = False
     team = None
     game_number = 1
+    game_date = None
     # sport_code = "mlb" # default sport is MLB
 
     # media_title = "MLBTV"
@@ -65,13 +66,19 @@ def play_stream(game_specifier, resolution=None,
 
     else:
         try:
-            (game_date, team, game_number) = game_specifier
+            (game_date, team, game_number) = game_specifier.split(".")
         except ValueError:
-            (game_date, team) = game_specifier
+            try:
+                (game_date, team) = game_specifier.split(".")
+            except ValueError:
+                game_date = datetime.now().date()
+                team = game_specifier
 
-        if "/" in team:
-            (sport_code, team) = team.split("/")
+        if "-" in team:
+            (sport_code, team) = team.split("-")
 
+        game_date = dateutil.parser.parse(game_date)
+        game_number = int(game_number)
         teams =  state.session.teams(season=game_date.year)
         team_id = teams.get(team)
 
@@ -81,13 +88,13 @@ def play_stream(game_specifier, resolution=None,
             )
             raise argparse.ArgumentTypeError(msg)
 
-    schedule = state.session.schedule(
-        start = game_date,
-        end = game_date,
-        # sport_id = sport["id"],
-        team_id = team_id
-    )
-    # raise Exception(schedule)
+        schedule = state.session.schedule(
+            start = game_date,
+            end = game_date,
+            # sport_id = sport["id"],
+            team_id = team_id
+        )
+        # raise Exception(schedule)
 
 
     try:
@@ -325,13 +332,7 @@ def main():
         description=init_parser.format_help(),
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("-d", "--date", help="game date",
-                        type=utils.valid_date,
-                        default=today)
-    parser.add_argument("-g", "--game-number",
-                        help="number of team game on date (for doubleheaders)",
-                        default=1,
-                        type=int)
+
     parser.add_argument("-b", "--begin",
                         help="begin playback at this offset from start",
                         nargs="?", metavar="offset_from_game_start",
@@ -348,15 +349,21 @@ def main():
                         help="verbose logging")
     group.add_argument("-q", "--quiet", action="count", default=0,
                         help="quiet logging")
-    parser.add_argument("provider", metavar="provider",
-                        help="stream provider")
     parser.add_argument("game", metavar="game",
                         nargs="?",
                         help="team abbreviation or MLB game ID")
     options, args = parser.parse_known_args(args)
 
-    # global logger
-    # logger = logging.getLogger("mlbstreamer")
+    try:
+        (provider, game) = options.game.split("/", 1)
+    except ValueError:
+        game = options.game#.split(".", 1)[1]
+        provider = list(config.settings.profile.providers.keys())[0]
+
+    if game.isdigit():
+        game_specifier = int(game)
+    else:
+        game_specifier = game
 
     utils.setup_logging(options.verbose - options.quiet)
 
@@ -373,16 +380,9 @@ def main():
     if not options.game:
         parser.error("option game")
 
-    session_class = getattr(session, f"{options.provider.upper()}StreamSession")
-    state.session = session_class.new(no_cache=options.no_cache)
-    # raise Exception(state.session.__class__)
+    state.session = session.new(provider)
     preferred_stream = None
     date = None
-
-    if options.game.isdigit():
-        game_specifier = int(options.game)
-    else:
-        game_specifier = (options.date, options.game, options.game_number)
 
     try:
         proc = play_stream(
