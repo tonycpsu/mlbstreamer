@@ -1,0 +1,33 @@
+profiles:
+    default:
+        providers:
+            mlb: # MLB.tv
+                username: change@me.com
+                password: changeme
+            nhl: # NHL.tv
+                username: change@me2.com
+                password: changeme2
+
+        player: /usr/local/bin/mpv -no-border --osd-level=0
+            --force-seekable --hr-seek=yes --hr-seek-framedrop=yes
+            --keep-open=yes --keep-open-pause=no --no-window-dragging
+            --cache=2048 --cache-backbuffer=8192 --demuxer-seekable-cache=yes
+        streamlink_args: --hls-audio-select *
+        time_zone: America/New_York
+        default_resolution: 720p_alt
+        hide_spoiler_teams: false #true to hide all, or list, e.g.
+            # - PHI
+            # - PIT
+
+    540p:
+        default_resolution: 540p
+        streamlink_args:
+    proxy:
+        proxies:
+            http: http://10.0.0.1:4123
+            https: http://10.0.0.1:4123
+
+#profile_map:
+    # use certain profiles for games involving certain teams,e.g.
+    # team:
+    #    - pit: proxy
