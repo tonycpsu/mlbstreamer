@@ -127,7 +127,8 @@ class Config(Tree):
 
         raise Exception("""
         Sorry, this configurator needs to be updated  to reflect recent changes
-        to the config file.  Until this is fixed, use the sample config
+        to the config file.  Until this is fixed, use the sample config found
+        in the "docs" directory of the distribution.
         """)
 
         from .session import StreamSession, StreamSessionException

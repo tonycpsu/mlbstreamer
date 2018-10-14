@@ -20,6 +20,9 @@ setup(name=name,
       ],
       license = "GPLv2",
       packages=find_packages(),
+      data_files=[
+          ('share/doc/%s' % name, ["docs/config.yaml.sample"]),
+      ],
       include_package_data=True,
       install_requires = [
           "six",
