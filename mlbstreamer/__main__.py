@@ -31,6 +31,7 @@ from . import play
 from . import widgets
 from . import utils
 from . import session
+from .exceptions import *
 
 
 class UrwidLoggingHandler(logging.Handler):
@@ -603,7 +604,7 @@ class ScheduleView(BaseView):
                 offset = offset
             )
         except play.MLBPlayException as e:
-            logger.error(e)
+            logger.warning(e)
 
 
 
@@ -638,7 +639,27 @@ def main():
                         help="game specifier", nargs="?")
     options, args = parser.parse_known_args()
 
-    utils.setup_logging(options.verbose - options.quiet)
+    log_file = os.path.join(config.CONFIG_DIR, "mlbstreamer.log")
+
+    # formatter = logging.Formatter(
+    #     "%(asctime)s [%(module)16s:%(lineno)-4d] [%(levelname)8s] %(message)s",
+    #     datefmt="%Y-%m-%d %H:%M:%S"
+    # )
+
+    fh = logging.FileHandler(log_file)
+    fh.setLevel(logging.DEBUG)
+    # fh.setFormatter(formatter)
+
+    logger = logging.getLogger("mlbstreamer")
+    # logger.setLevel(logging.INFO)
+    # logger.addHandler(fh)
+
+    ulh = UrwidLoggingHandler()
+    # ulh.setLevel(logging.DEBUG)
+    # ulh.setFormatter(formatter)
+    # logger.addHandler(ulh)
+
+    utils.setup_logging(options.verbose - options.quiet, handlers=[fh, ulh])
 
     try:
         (provider, game_date) = options.game.split("/", 1)
@@ -652,25 +673,6 @@ def main():
 
 
 
-    log_file = os.path.join(config.CONFIG_DIR, "mlbstreamer.log")
-
-    formatter = logging.Formatter(
-        "%(asctime)s [%(module)16s:%(lineno)-4d] [%(levelname)8s] %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-
-    fh = logging.FileHandler(log_file)
-    fh.setLevel(logging.DEBUG)
-    fh.setFormatter(formatter)
-
-    logger = logging.getLogger("mlbstreamer")
-    logger.setLevel(logging.INFO)
-    logger.addHandler(fh)
-
-    ulh = UrwidLoggingHandler()
-    ulh.setLevel(logging.DEBUG)
-    ulh.setFormatter(formatter)
-    logger.addHandler(ulh)
 
     logger.debug("mlbstreamer starting")
 
@@ -687,8 +689,8 @@ def main():
     log_console = widgets.ConsoleWindow()
     # log_box = urwid.BoxAdapter(urwid.LineBox(log_console), 10)
     pile = urwid.Pile([
-        ("weight", 1, urwid.LineBox(view)),
-        (6, urwid.LineBox(log_console))
+        ("weight", 5, urwid.LineBox(view)),
+        ("weight", 1, urwid.LineBox(log_console))
     ])
 
     def global_input(key):

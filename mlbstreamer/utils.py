@@ -1,4 +1,5 @@
 import logging
+import sys
 import argparse
 from datetime import datetime
 from orderedattrdict import AttrDict
@@ -12,7 +13,7 @@ LOG_LEVELS = [
     "debug",
     "trace"
 ]
-def setup_logging(level=0):
+def setup_logging(level=0, handlers=[]):
 
     level = LOG_LEVEL_DEFAULT + level
     if level < 0 or level >= len(LOG_LEVELS):
@@ -31,21 +32,31 @@ def setup_logging(level=0):
     else:
         level = getattr(logging, LOG_LEVELS[level].upper())
 
-    # logger = logging.getLogger()
-    # formatter = logging.Formatter(
-    #     "%(asctime)s [%(module)16s:%(lineno)-4d] [%(levelname)8s] %(message)s",
-    #     datefmt="%Y-%m-%d %H:%M:%S"
-    # )
-    # handler = logging.StreamHandler(sys.stdout)
-    # handler.setFormatter(formatter)
-    # logger.addHandler(handler)
-    # logger.setLevel(level)
+    if not isinstance(handlers, list):
+        handlers = [handlers]
 
-    logger = logging.basicConfig(
-        level=level,
-        format="%(asctime)s [%(module)16s:%(lineno)-4d] [%(levelname)8s] %(message)s",
+    logger = logging.getLogger()
+    formatter = logging.Formatter(
+        "%(asctime)s [%(module)16s:%(lineno)-4d] [%(levelname)8s] %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
     )
+    logger.setLevel(level)
+    outh = logging.StreamHandler(sys.stdout)
+    outh.setLevel(logging.ERROR)
+
+    handlers.insert(0, outh)
+    # if not handlers:
+    #     handlers = [logging.StreamHandler(sys.stdout)]
+    for handler in handlers:
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+
+    # logger = logging.basicConfig(
+    #     level=level,
+    #     format="%(asctime)s [%(module)16s:%(lineno)-4d] [%(levelname)8s] %(message)s",
+    #     datefmt="%Y-%m-%d %H:%M:%S"
+    # )
+
     logging.getLogger("requests").setLevel(level)
     logging.getLogger("urllib3").setLevel(level)
 

@@ -18,6 +18,7 @@ from . import config
 from . import state
 from . import session
 from . import utils
+from .exceptions import *
 # from .session import *
 
 
@@ -30,12 +31,6 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     logger.error("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
 
 sys.excepthook = handle_exception
-
-class MLBPlayException(Exception):
-    pass
-
-class MLBPlayInvalidArgumentError(MLBPlayException):
-    pass
 
 def play_stream(game_specifier, resolution=None,
                 offset=None,

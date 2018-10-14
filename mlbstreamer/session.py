@@ -28,6 +28,7 @@ import dateutil.parser
 from . import config
 from . import state
 from .state import memo
+from .exceptions import *
 
 USER_AGENT = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10.12; rv:56.0) "
               "Gecko/20100101 Firefox/56.0.4")
@@ -45,10 +46,6 @@ class Media(AttrDict):
 
 
 class Stream(AttrDict):
-    pass
-
-
-class StreamSessionException(Exception):
     pass
 
 class StreamSession(object):
@@ -919,9 +916,12 @@ class NHLStreamSession(BAMStreamSessionMixin, StreamSession):
         logger.trace(json.dumps(j, sort_keys=True,
                                    indent=4, separators=(',', ': ')))
 
-        media_auth = next(x["attributeValue"]
-                          for x in j["session_info"]["sessionAttributes"]
-                          if x["attributeName"] == "mediaAuth_v2")
+        try:
+            media_auth = next(x["attributeValue"]
+                              for x in j["session_info"]["sessionAttributes"]
+                              if x["attributeName"] == "mediaAuth_v2")
+        except KeyError:
+            raise StreamSessionException(f"No stream found for event {event_id}")
 
         self.cookies.set_cookie(
             Cookie(0, 'mediaAuth_v2', media_auth,
