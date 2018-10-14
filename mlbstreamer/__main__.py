@@ -93,6 +93,7 @@ class MLBLineScoreDataTable(DataTable):
         data = []
         for s, side in enumerate(["away", "home"]):
 
+            i = -1
             line = AttrDict()
 
             if isinstance(line_score["innings"], list):
@@ -321,7 +322,7 @@ class ResolutionDropdown(Dropdown):
 
     def __init__(self, resolutions, default=None):
         self.resolutions = resolutions
-        super(ResolutionDropdown, self).__init__(resolutions, default)
+        super(ResolutionDropdown, self).__init__(resolutions, default=default)
 
     @property
     def items(self):
