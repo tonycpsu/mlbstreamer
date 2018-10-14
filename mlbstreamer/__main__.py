@@ -177,7 +177,7 @@ class NHLLineScoreDataTable(DataTable):
 
             i = -1
             line = AttrDict()
-            if isinstance(line_score["periods"], list):
+            if "periods" in line_score and isinstance(line_score["periods"], list):
                 for i, period in enumerate(line_score["periods"]):
                     if not s:
                         columns.append(
@@ -328,7 +328,10 @@ class ResolutionDropdown(Dropdown):
     def items(self):
         return self.resolutions
 
+
 class Toolbar(urwid.WidgetWrap):
+
+    signals = ["provider_change"]
 
     def __init__(self):
 
@@ -341,7 +344,12 @@ class Toolbar(urwid.WidgetWrap):
         self.provider_dropdown = Dropdown(AttrDict(
             [ (p.upper(), p)
               for p in session.PROVIDERS]
-        ) , label="Provider")
+        ) , label="Provider", margin=1)
+
+        urwid.connect_signal(
+            self.provider_dropdown, "change",
+            lambda w, b, v: self._emit("provider_change", v)
+        )
 
         self.live_stream_dropdown = Dropdown([
             "live",
@@ -525,27 +533,41 @@ class ScheduleView(BaseView):
 
     def __init__(self, provider, date):
 
-        self.provider = provider
         self.game_date = date
 
-        state.session = state.session = session.new(provider)
         self.toolbar = Toolbar()
+        urwid.connect_signal(
+            self.toolbar, "provider_change",
+            lambda w, p: self.set_provider(p)
+        )
+
+        self.table_placeholder = urwid.WidgetPlaceholder(urwid.Text(""))
+
         self.datebar = DateBar(self.game_date)
         # self.table = GamesDataTable(self.toolbar.sport_id, self.game_date) # preseason
-        self.table = GamesDataTable(self.provider, self.game_date) # preseason
-
-        urwid.connect_signal(self.table, "select",
-                             lambda source, selection: self.open_watch_dialog(selection["game_id"]))
         self.pile  = urwid.Pile([
             (1, self.toolbar),
             (1, self.datebar),
-            ("weight", 1, self.table)
+            ("weight", 1, self.table_placeholder)
         ])
         self.pile.focus_position = 2
 
+        super(ScheduleView, self).__init__(self.pile)
+        self.set_provider(provider)
+
+    def set_provider(self, provider):
+
+        logger.warning("set provider")
+        self.provider = provider
+        state.session = session.new(self.provider)
         self.toolbar.set_resolutions(state.session.RESOLUTIONS)
 
-        super(ScheduleView, self).__init__(self.pile)
+        self.table = GamesDataTable(self.provider, self.game_date) # preseason
+        self.table_placeholder.original_widget = self.table
+        urwid.connect_signal(self.table, "select",
+                             lambda source, selection: self.open_watch_dialog(selection["game_id"]))
+
+
 
     def open_watch_dialog(self, game_id):
         dialog = WatchDialog(game_id,
