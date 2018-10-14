@@ -38,7 +38,6 @@ CACHE_DURATION_MEDIUM = 60*60*24 # 1 day
 CACHE_DURATION_LONG = 60*60*24*30  # 30 days
 CACHE_DURATION_DEFAULT = CACHE_DURATION_SHORT
 
-COOKIE_FILE=os.path.join(config.CONFIG_DIR, "cookies")
 CACHE_FILE=os.path.join(config.CONFIG_DIR, "cache.sqlite")
 
 class Media(AttrDict):
@@ -77,9 +76,9 @@ class StreamSession(object):
 
         self.session = requests.Session()
         self.cookies = LWPCookieJar()
-        if not os.path.exists(COOKIE_FILE):
-            self.cookies.save(COOKIE_FILE)
-        self.cookies.load(COOKIE_FILE, ignore_discard=True)
+        if not os.path.exists(self.COOKIES_FILE):
+            self.cookies.save(self.COOKIES_FILE)
+        self.cookies.load(self.COOKIES_FILE, ignore_discard=True)
         self.session.headers = self.HEADERS
         self._state = AttrDict([
             ("username", username),
@@ -104,6 +103,14 @@ class StreamSession(object):
     @classmethod
     def session_type(cls):
         return cls.__name__.replace("StreamSession", "").lower()
+
+    @classmethod
+    def _COOKIES_FILE(cls):
+        return os.path.join(config.CONFIG_DIR, f"{cls.session_type()}.cookies")
+
+    @property
+    def COOKIES_FILE(self):
+        return self._COOKIES_FILE()
 
     @classmethod
     def _SESSION_FILE(cls):
@@ -134,8 +141,8 @@ class StreamSession(object):
 
     @classmethod
     def destroy(cls):
-        if os.path.exists(cls.COOKIE_FILE):
-            os.remove(cls.COOKIE_FILE)
+        if os.path.exists(cls.COOKIES_FILE):
+            os.remove(cls.COOKIES_FILE)
         if os.path.exists(cls.SESSION_FILE):
             os.remove(cls.SESSION_FILE)
 
@@ -149,7 +156,7 @@ class StreamSession(object):
         logger.trace(f"load: {self.__class__.__name__}, {self._state}")
         with open(self.SESSION_FILE, 'w') as outfile:
             yaml.dump(self._state, outfile, default_flow_style=False)
-        self.cookies.save(COOKIE_FILE)
+        self.cookies.save(self.COOKIES_FILE)
 
 
     def get_cookie(self, name):
@@ -929,8 +936,13 @@ def main():
 
     utils.setup_logging(options.verbose - options.quiet)
 
-    state.session = NHLStreamSession.new()
-    raise Exception(state.session.session_key)
+    state.session = MLBStreamSession.new()
+    raise Exception(state.session.token)
+
+    # state.session = NHLStreamSession.new()
+    # raise Exception(state.session.session_key)
+
+
     # schedule = state.session.schedule(game_id=2018020020)
     # media = state.session.get_epgs(game_id=2018020020)
     # print(json.dumps(list(media), sort_keys=True,
