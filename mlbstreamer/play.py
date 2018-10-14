@@ -23,7 +23,8 @@ from .exceptions import *
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
-    state.session.save()
+    if state.session:
+        state.session.save()
     if issubclass(exc_type, KeyboardInterrupt):
         sys.__excepthook__(exc_type, exc_value, exc_traceback)
         return
