@@ -155,7 +155,7 @@ def play_stream(game_specifier, resolution=None,
         try:
             # media_url = stream["stream"]["complete"]
             media_url = stream.url
-        except TypeError:
+        except (TypeError, AttributeError):
             raise MLBPlayException("no stream URL for game %d" %(game_id))
 
     offset_timestamp = None
