@@ -227,13 +227,32 @@ class NHLLineScoreDataTable(DataTable):
 
 
 
+def format_start_time(d):
+    s = datetime.strftime(d, "%I:%M%p").lower()[:-1]
+    if s[0] == "0":
+        s = s[1:]
+    return s
+
+
+class MediaAttributes(AttrDict):
+
+    def __repr__(self):
+        state = "!" if self.state == "MEDIA_ON" else "."
+        free = "_" if self.free else "$"
+        return f"{state}{free}"
+
+
 class GamesDataTable(DataTable):
 
+    # sort_by = "start"
+
     columns = [
-        DataTableColumn("start", width=6, align="right"),
+        DataTableColumn("attrs", width=6, align="right"),
+        DataTableColumn("start", width=6, align="right",
+                        format_fn = format_start_time),
         # DataTableColumn("game_type", label="type", width=5, align="right"),
-        DataTableColumn("away", width=13),
-        DataTableColumn("home", width=13),
+        DataTableColumn("away", width=16),
+        DataTableColumn("home", width=16),
         DataTableColumn("line"),
         # DataTableColumn("game_id", width=6, align="right"),
     ]
@@ -265,7 +284,9 @@ class GamesDataTable(DataTable):
         )
         for d in j["dates"]:
 
-            for g in d["games"]:
+            games = sorted(d["games"], key= lambda g: g["gameDate"])
+
+            for g in games:
                 game_pk = g["gamePk"]
                 game_type = g["gameType"]
                 status = g["status"]["statusCode"]
@@ -274,6 +295,15 @@ class GamesDataTable(DataTable):
                 away_abbrev = g["teams"]["away"]["team"]["abbreviation"]
                 home_abbrev = g["teams"]["home"]["team"]["abbreviation"]
                 start_time = dateutil.parser.parse(g["gameDate"])
+                attrs = MediaAttributes()
+                try:
+                    item = free_game = g["content"]["media"]["epg"][0]["items"][0]
+                    attrs.state = item["mediaState"]
+                    attrs.free = item["freeGame"]
+                except:
+                    attrs.state = None
+                    attrs.free = None
+
                 if config.settings.profile.time_zone:
                     start_time = start_time.astimezone(
                         pytz.timezone(config.settings.profile.time_zone)
@@ -303,17 +333,21 @@ class GamesDataTable(DataTable):
                     )
                 else:
                     self.line_score = None
+
+                # timestr = datetime.strftime(
                 yield dict(
                     game_id = game_pk,
                     game_type = game_type,
                     away = away_team,
                     home = home_team,
-                    start = "%d:%02d%s" %(
-                        start_time.hour - 12 if start_time.hour > 12 else start_time.hour,
-                        start_time.minute,
-                        "p" if start_time.hour >= 12 else "a"
-                    ),
-                    line = self.line_score
+                    start = start_time,
+                    # start = "%d:%02d%s" %(
+                    #     start_time.hour - 12 if start_time.hour > 12 else start_time.hour,
+                    #     start_time.minute,
+                    #     "p" if start_time.hour >= 12 else "a"
+                    # ),
+                    line = self.line_score,
+                    attrs = attrs
                 )
 
 class ResolutionDropdown(Dropdown):
@@ -682,7 +716,9 @@ def main():
     # ulh.setFormatter(formatter)
     # logger.addHandler(ulh)
 
-    utils.setup_logging(options.verbose - options.quiet, handlers=[fh, ulh])
+    utils.setup_logging(options.verbose - options.quiet,
+                        handlers=[fh, ulh],
+                        quiet_stdout=True)
 
     try:
         (provider, game_date) = options.game.split("/", 1)

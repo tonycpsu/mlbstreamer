@@ -876,10 +876,10 @@ class NHLStreamSession(BAMStreamSessionMixin, StreamSession):
 
         url = "https://mf.svc.nhl.com/ws/media/mf/v2.4/stream"
 
+        event_id = media["eventId"]
         if not self.session_key:
             logger.info("getting session key")
 
-            event_id = media["eventId"]
 
             params = {
                 "eventId": event_id,
