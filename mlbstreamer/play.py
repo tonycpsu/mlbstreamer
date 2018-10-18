@@ -363,16 +363,6 @@ def main():
 
     utils.setup_logging(options.verbose - options.quiet)
 
-    if options.verbose:
-        logger.setLevel(logging.DEBUG)
-        formatter = logging.Formatter("%(asctime)s [%(levelname)8s] %(message)s",
-                                      datefmt='%Y-%m-%d %H:%M:%S')
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-    else:
-        logger.addHandler(logging.NullHandler())
-
     if not options.game:
         parser.error("option game")
 

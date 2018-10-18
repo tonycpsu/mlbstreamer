@@ -13,7 +13,7 @@ LOG_LEVELS = [
     "debug",
     "trace"
 ]
-def setup_logging(level=0, handlers=[]):
+def setup_logging(level=0, handlers=[], quiet_stdout=False):
 
     level = LOG_LEVEL_DEFAULT + level
     if level < 0 or level >= len(LOG_LEVELS):
@@ -42,7 +42,7 @@ def setup_logging(level=0, handlers=[]):
     )
     logger.setLevel(level)
     outh = logging.StreamHandler(sys.stdout)
-    outh.setLevel(logging.ERROR)
+    outh.setLevel(logging.ERROR if quiet_stdout else level)
 
     handlers.insert(0, outh)
     # if not handlers:
@@ -57,8 +57,8 @@ def setup_logging(level=0, handlers=[]):
     #     datefmt="%Y-%m-%d %H:%M:%S"
     # )
 
-    logging.getLogger("requests").setLevel(level)
-    logging.getLogger("urllib3").setLevel(level)
+    logging.getLogger("requests").setLevel(level+1)
+    logging.getLogger("urllib3").setLevel(level+1)
 
 
 def valid_date(s):
