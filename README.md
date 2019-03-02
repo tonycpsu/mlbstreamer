@@ -32,6 +32,12 @@ To upgrade, just add `-U`:
 This installation method should pull down all the necessary dependencies from
 PyPI.
 
+For Arch Linux users, `mlbstreamer` can be installed from the AUR. The latest
+release is in the [mlbstreamer](https://aur.archlinux.org/packages/mlbstreamer/)
+package, and the development version in the
+[mlbstreamer-git](https://aur.archlinux.org/packages/mlbstreamer-git/) package.
+
+
 Configuration
 -------------
 
