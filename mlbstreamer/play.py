@@ -67,7 +67,7 @@ def play_stream(game_specifier, resolution=None,
             try:
                 (game_date, team) = game_specifier.split(".")
             except ValueError:
-                game_date = datetime.now().date()
+                game_date = str(datetime.now().date())
                 team = game_specifier
 
         if "-" in team:
